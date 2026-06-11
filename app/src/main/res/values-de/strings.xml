@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ClashReminders</string>
+
+    <!-- Notification channels -->
+    <string name="channel_reminders_name">Erinnerungen</string>
+    <string name="channel_reminders_description">Erinnerungen an offene Angriffe in CW, CWL, Raid-Wochenende und Clan-Spielen</string>
+    <string name="channel_war_start_name">Kriegsstart</string>
+    <string name="channel_war_start_description">Benachrichtigungen, wenn ein neuer Clankrieg gefunden wurde</string>
+
+    <!-- Notification content -->
+    <string name="notif_war_end_title">%1$s – Clankrieg – noch %2$s</string>
+    <string name="notif_war_end_all_done">Alle Angriffe erledigt – stark gespielt!</string>
+    <string name="notif_war_member_line">%1$s (%2$d/%3$d)</string>
+    <string name="notif_war_start_title">%1$s – Krieg gefunden</string>
+    <string name="notif_war_start_preparation">Der Vorbereitungstag hat begonnen.</string>
+    <string name="notif_war_start_battle">Der Kampftag hat begonnen!</string>
+    <string name="notif_cwl_title">%1$s – CWL-Tag – noch %2$s</string>
+    <string name="notif_cwl_all_done">Alle CWL-Angriffe erledigt!</string>
+    <string name="notif_raid_title">%1$s – Raid-Wochenende – noch %2$s</string>
+    <string name="notif_raid_not_attacked">Nicht angegriffen:</string>
+    <string name="notif_raid_open_attacks">Offene Angriffe:</string>
+    <string name="notif_raid_member_line">%1$s: %2$d/%3$d</string>
+    <string name="notif_raid_all_done">Alle Raid-Angriffe erledigt!</string>
+    <string name="notif_cg_title">%1$s – Clan-Spiele – noch %2$s</string>
+    <string name="notif_cg_member_line">%1$s: %2$d Punkte</string>
+    <string name="notif_cg_no_baseline">%1$s: (kein Startwert)</string>
+    <string name="notif_degraded_text">Aktuelle Daten konnten nicht geladen werden – prüfe offene Angriffe im Spiel.</string>
+    <string name="notif_remaining_hours_minutes">%1$dh %2$dm</string>
+    <string name="notif_remaining_minutes">%1$dm</string>
+
+    <!-- Clan list -->
+    <string name="clan_list_title">Clans</string>
+    <string name="clan_list_empty">Noch keine Clans. Füge deinen ersten Clan hinzu, um Erinnerungen zu bekommen.</string>
+    <string name="clan_list_add">Clan hinzufügen</string>
+    <string name="clan_list_refresh">Aktualisieren</string>
+    <string name="clan_list_settings">Einstellungen</string>
+    <string name="clan_list_reminders_count">%1$d Erinnerungen aktiv</string>
+    <string name="clan_status_war">Krieg: %1$s</string>
+    <string name="clan_status_no_war">Kein aktiver Krieg</string>
+    <string name="clan_status_loading">Status wird geladen…</string>
+    <string name="war_state_preparation">Vorbereitungstag</string>
+    <string name="war_state_in_war">Kampftag</string>
+    <string name="war_state_ended">beendet</string>
+
+    <!-- Clan detail -->
+    <string name="clan_detail_reminders">Erinnerungen</string>
+    <string name="clan_detail_add_reminder">Erinnerung hinzufügen</string>
+    <string name="clan_detail_delete_clan">Clan entfernen</string>
+    <string name="clan_detail_delete_clan_confirm">Diesen Clan und alle zugehörigen Erinnerungen entfernen?</string>
+    <string name="clan_detail_no_reminders">Für diesen Clan sind noch keine Erinnerungen eingerichtet.</string>
+    <string name="reminder_offset_before_war_end">%1$s vor Kriegsende</string>
+    <string name="reminder_offset_before_cwl_day_end">%1$s vor CWL-Tagesende</string>
+    <string name="reminder_offset_before_cg_end">%1$s vor Ende der Clan-Spiele</string>
+    <string name="reminder_war_start_label">Wenn ein Krieg gefunden wird</string>
+    <string name="reminder_raid_label">%1$s um %2$s</string>
+    <string name="reminder_delete">Erinnerung löschen</string>
+    <string name="reminder_fire_now">Jetzt feuern (Debug)</string>
+
+    <!-- Reminder types -->
+    <string name="type_war_start">Kriegsstart</string>
+    <string name="type_war_end">Kriegsende</string>
+    <string name="type_cwl_day_end">CWL-Tag</string>
+    <string name="type_raid">Raid-Wochenende</string>
+    <string name="type_clan_games">Clan-Spiele</string>
+
+    <!-- Add reminder dialog -->
+    <string name="add_reminder_title">Neue Erinnerung</string>
+    <string name="add_reminder_type">Typ</string>
+    <string name="add_reminder_offset_hours">Stunden</string>
+    <string name="add_reminder_offset_minutes">Minuten</string>
+    <string name="add_reminder_offset_hint">Vorlauf vor dem Ende des Events</string>
+    <string name="add_reminder_raid_day">Wochenendtag</string>
+    <string name="add_reminder_raid_time">Uhrzeit</string>
+    <string name="add_reminder_cg_threshold">Punkte-Schwelle</string>
+    <string name="add_reminder_save">Speichern</string>
+    <string name="add_reminder_cancel">Abbrechen</string>
+    <string name="day_friday">Freitag</string>
+    <string name="day_saturday">Samstag</string>
+    <string name="day_sunday">Sonntag</string>
+    <string name="day_monday">Montag</string>
+
+    <!-- Add clan -->
+    <string name="add_clan_title">Clan hinzufügen</string>
+    <string name="add_clan_tag_label">Clan-Tag</string>
+    <string name="add_clan_tag_hint">#2PP0JCCL</string>
+    <string name="add_clan_validate">Nachschlagen</string>
+    <string name="add_clan_save">Clan hinzufügen</string>
+    <string name="add_clan_defaults">Standard-Erinnerungen anlegen (Kriegsende 2h, CWL-Tag 2h, Raid Sonntag 18:00, Clan-Spiele 24h)</string>
+    <string name="add_clan_not_found">Clan nicht gefunden – prüfe den Tag.</string>
+    <string name="add_clan_forbidden">Zugriff verweigert (403): Prüfe deinen API-Key und ob die IP 45.79.218.79 freigeschaltet ist.</string>
+    <string name="add_clan_network_error">Netzwerkfehler – bitte erneut versuchen.</string>
+    <string name="add_clan_already_added">Dieser Clan ist bereits hinzugefügt.</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Einstellungen</string>
+    <string name="settings_api_key">Clash of Clans API-Key</string>
+    <string name="settings_api_key_hint">Erstelle den Key auf developer.clashofclans.com und schalte die IP 45.79.218.79 frei (RoyaleAPI-Proxy). Anfragen laufen über cocproxy.royaleapi.dev.</string>
+    <string name="settings_api_key_show">Key anzeigen</string>
+    <string name="settings_api_key_save">Key speichern</string>
+    <string name="settings_api_key_saved">API-Key gespeichert.</string>
+    <string name="settings_test_connection">Verbindung testen</string>
+    <string name="settings_test_success">Verbindung OK – API-Key funktioniert.</string>
+    <string name="settings_test_forbidden">Abgelehnt (403): Key ungültig oder Proxy-IP nicht freigeschaltet.</string>
+    <string name="settings_test_network_error">Netzwerkfehler – keine Verbindung zum Proxy.</string>
+    <string name="settings_notifications_title">Benachrichtigungen</string>
+    <string name="settings_notifications_grant">Benachrichtigungen erlauben</string>
+    <string name="settings_notifications_granted">Benachrichtigungen sind erlaubt.</string>
+    <string name="settings_notifications_rationale">Ohne diese Berechtigung können keine Erinnerungen angezeigt werden.</string>
+    <string name="settings_exact_alarm_title">Exakte Alarme</string>
+    <string name="settings_exact_alarm_grant">Exakte Alarme erlauben</string>
+    <string name="settings_exact_alarm_granted">Exakte Alarme sind erlaubt.</string>
+    <string name="settings_exact_alarm_rationale">Ohne exakte Alarme können Erinnerungen bis zu 15 Minuten später ankommen.</string>
+    <string name="settings_last_refresh">Letzte Aktualisierung: %1$s</string>
+    <string name="settings_last_refresh_never">Letzte Aktualisierung: nie</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_welcome">Willkommen bei ClashReminders!</string>
+    <string name="onboarding_intro">Lass dich an offene Kriegsangriffe, CWL-Hits, Raid-Angriffe und Clan-Spiele erinnern – direkt auf deinem Handy.</string>
+    <string name="onboarding_step_key">Schritt 1: Gib deinen Clash of Clans API-Key ein</string>
+    <string name="onboarding_step_clan">Schritt 2: Füge deinen ersten Clan hinzu</string>
+    <string name="onboarding_continue">Weiter</string>
+
+    <!-- Misc -->
+    <string name="back">Zurück</string>
+    <string name="error_generic">Etwas ist schiefgelaufen.</string>
+</resources>
