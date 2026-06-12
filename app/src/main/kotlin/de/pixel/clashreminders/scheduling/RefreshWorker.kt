@@ -77,6 +77,7 @@ class RefreshWorker(
     override suspend fun doWork(): Result {
         if (settings.apiKeyOnce() == null) {
             Log.d(AlarmScheduler.TAG, "Refresh skipped: no API key configured")
+            WidgetUpdateWorker.enqueue(applicationContext, forced = true)
             return Result.success()
         }
         val now = System.currentTimeMillis()
@@ -106,6 +107,7 @@ class RefreshWorker(
         snapshotDao.deleteOlderThan(now - SNAPSHOT_RETENTION_MILLIS)
         settings.setLastRefreshAt(now)
         Log.d(AlarmScheduler.TAG, "Refresh done: ${desired.size} alarms scheduled")
+        WidgetUpdateWorker.enqueue(applicationContext, forced = true)
         return Result.success()
     }
 

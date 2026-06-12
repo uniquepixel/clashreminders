@@ -51,6 +51,7 @@ import de.pixel.clashreminders.ClashRemindersApp
 import de.pixel.clashreminders.R
 import de.pixel.clashreminders.api.dto.CurrentWarDto
 import de.pixel.clashreminders.data.db.entity.AccountEntity
+import de.pixel.clashreminders.data.repository.AccountStatus
 import de.pixel.clashreminders.ui.component.ClanBadge
 
 @OptIn(ExperimentalMaterial3Api::class)

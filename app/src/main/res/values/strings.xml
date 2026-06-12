@@ -123,6 +123,16 @@
     <string name="onboarding_step_account">Step 2: Add your first account</string>
     <string name="onboarding_continue">Continue</string>
 
+    <!-- Widget -->
+    <string name="widget_name">To-do</string>
+    <string name="widget_description">Shows open war, raid and clan games tasks for your accounts</string>
+    <string name="widget_refresh">Refresh</string>
+    <string name="widget_updated_at">Updated %1$s</string>
+    <string name="widget_all_done">All done ✓</string>
+    <string name="widget_no_data">No data yet – tap refresh</string>
+    <string name="widget_no_api_key">Set up the app first (API key missing)</string>
+    <string name="widget_no_accounts">No accounts added yet</string>
+
     <!-- Misc -->
     <string name="back">Back</string>
     <string name="error_generic">Something went wrong.</string>

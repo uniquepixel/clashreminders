@@ -30,6 +30,8 @@ class AppWorkerFactory(
             PresenceWorker(appContext, workerParameters, database, settingsRepository, api)
         ClanGamesSnapshotWorker::class.java.name ->
             ClanGamesSnapshotWorker(appContext, workerParameters, database, settingsRepository, api)
+        WidgetUpdateWorker::class.java.name ->
+            WidgetUpdateWorker(appContext, workerParameters, database, settingsRepository, api)
         else -> null
     }
 }

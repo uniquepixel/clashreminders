@@ -123,6 +123,16 @@
     <string name="onboarding_step_account">Schritt 2: Füge deinen ersten Account hinzu</string>
     <string name="onboarding_continue">Weiter</string>
 
+    <!-- Widget -->
+    <string name="widget_name">To-do</string>
+    <string name="widget_description">Zeigt offene CW-, Raid- und Clan-Spiele-Aufgaben deiner Accounts</string>
+    <string name="widget_refresh">Aktualisieren</string>
+    <string name="widget_updated_at">Stand %1$s</string>
+    <string name="widget_all_done">Alles erledigt ✓</string>
+    <string name="widget_no_data">Noch keine Daten – tippe auf Aktualisieren</string>
+    <string name="widget_no_api_key">Richte zuerst die App ein (API-Key fehlt)</string>
+    <string name="widget_no_accounts">Noch keine Accounts hinzugefügt</string>
+
     <!-- Misc -->
     <string name="back">Zurück</string>
     <string name="error_generic">Etwas ist schiefgelaufen.</string>

@@ -87,6 +87,10 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.kotlinx.serialization.json)
 
+    // Widget
+    implementation(libs.glance.appwidget)
+    implementation(libs.glance.material3)
+
     // Images
     implementation(libs.coil.compose)
 

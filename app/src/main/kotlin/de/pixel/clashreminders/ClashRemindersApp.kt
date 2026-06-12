@@ -6,6 +6,7 @@ import androidx.work.WorkManager
 import de.pixel.clashreminders.api.CocApiClient
 import de.pixel.clashreminders.data.db.AppDatabase
 import de.pixel.clashreminders.data.repository.AccountRepository
+import de.pixel.clashreminders.data.repository.AccountStatusLoader
 import de.pixel.clashreminders.data.repository.SettingsRepository
 import de.pixel.clashreminders.notification.NotificationHelper
 import de.pixel.clashreminders.scheduling.AlarmScheduler
@@ -20,6 +21,8 @@ class ClashRemindersApp : Application(), Configuration.Provider {
     val settingsRepository by lazy { SettingsRepository(this) }
 
     val apiClient by lazy { CocApiClient { settingsRepository.apiKeyOnce() } }
+
+    val accountStatusLoader by lazy { AccountStatusLoader(database, apiClient) }
 
     val accountRepository by lazy {
         AccountRepository(
