@@ -5,7 +5,8 @@ import de.pixel.clashreminders.api.dto.CurrentWarDto
 
 data class PlannedAlarm(
     val reminderId: Long,
-    val clanTag: String,
+    /** Clan the alarm refers to (war/CWL); null for raid and clan games. */
+    val clanTag: String?,
     val type: ReminderType,
     val fireAtMillis: Long,
     val eventKey: String,
@@ -39,9 +40,10 @@ object EventPlanner {
         eventEndMillis: Long,
         eventKey: String,
         nowMillis: Long,
+        clanTag: String? = null,
     ): Outcome {
         val fireAt = eventEndMillis - reminder.offsetMinutes * 60_000L
-        val alarm = PlannedAlarm(reminder.id, reminder.clanTag, reminder.type, fireAt, eventKey)
+        val alarm = PlannedAlarm(reminder.id, clanTag, reminder.type, fireAt, eventKey)
         return when {
             fireAt > nowMillis -> Outcome.Schedule(alarm)
             nowMillis - fireAt <= OVERDUE_GRACE_MILLIS -> Outcome.FireNow(alarm)
@@ -52,7 +54,7 @@ object EventPlanner {
     /**
      * War-start trigger condition from Bot.java: a war becomes visible when
      * the stored state was inactive and the fresh state is active. A null
-     * old state (clan just added) must NOT fire — only store.
+     * old state (clan just discovered) must NOT fire — only store.
      */
     fun isWarStartTransition(oldState: String?, newState: String?): Boolean =
         oldState != null &&

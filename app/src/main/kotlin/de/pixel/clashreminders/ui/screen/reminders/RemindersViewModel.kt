@@ -1,4 +1,4 @@
-package de.pixel.clashreminders.ui.screen.clandetail
+package de.pixel.clashreminders.ui.screen.reminders
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -14,22 +14,15 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-class ClanDetailViewModel(
-    private val app: ClashRemindersApp,
-    private val clanTag: String,
-) : ViewModel() {
+class RemindersViewModel(private val app: ClashRemindersApp) : ViewModel() {
 
-    val clan = app.clanRepository.observeClan(clanTag)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
-
-    val reminders = app.clanRepository.observeReminders(clanTag)
+    val reminders = app.accountRepository.observeReminders()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun addReminder(new: NewReminder) {
         viewModelScope.launch {
-            app.clanRepository.addReminder(
+            app.accountRepository.addReminder(
                 ReminderEntity(
-                    clanTag = clanTag,
                     type = new.type,
                     offsetMinutes = new.offsetMinutes,
                     cgThreshold = new.cgThreshold,
@@ -43,23 +36,15 @@ class ClanDetailViewModel(
 
     fun setEnabled(reminder: ReminderEntity, enabled: Boolean) {
         viewModelScope.launch {
-            app.clanRepository.updateReminder(reminder.copy(enabled = enabled))
+            app.accountRepository.updateReminder(reminder.copy(enabled = enabled))
             RefreshWorker.enqueueNow(app)
         }
     }
 
     fun deleteReminder(reminder: ReminderEntity) {
         viewModelScope.launch {
-            app.clanRepository.deleteReminder(reminder.id)
+            app.accountRepository.deleteReminder(reminder.id)
             RefreshWorker.enqueueNow(app)
-        }
-    }
-
-    fun deleteClan(onDeleted: () -> Unit) {
-        viewModelScope.launch {
-            app.clanRepository.deleteClan(clanTag)
-            RefreshWorker.enqueueNow(app)
-            onDeleted()
         }
     }
 
@@ -69,9 +54,8 @@ class ClanDetailViewModel(
     }
 
     companion object {
-        fun factory(app: ClashRemindersApp, clanTag: String): ViewModelProvider.Factory =
-            viewModelFactory {
-                initializer { ClanDetailViewModel(app, clanTag) }
-            }
+        fun factory(app: ClashRemindersApp): ViewModelProvider.Factory = viewModelFactory {
+            initializer { RemindersViewModel(app) }
+        }
     }
 }

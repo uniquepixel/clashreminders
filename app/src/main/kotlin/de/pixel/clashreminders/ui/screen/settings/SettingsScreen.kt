@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
@@ -57,7 +56,6 @@ import java.util.Date
 @Composable
 fun SettingsScreen(
     app: ClashRemindersApp,
-    onBack: () -> Unit,
     viewModel: SettingsViewModel = viewModel(factory = SettingsViewModel.factory(app)),
 ) {
     val context = LocalContext.current
@@ -75,11 +73,6 @@ fun SettingsScreen(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.settings_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back))
-                    }
-                },
             )
         },
     ) { padding ->

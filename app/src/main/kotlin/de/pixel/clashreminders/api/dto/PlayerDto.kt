@@ -6,6 +6,8 @@ import kotlinx.serialization.Serializable
 data class PlayerDto(
     val tag: String? = null,
     val name: String? = null,
+    val townHallLevel: Int? = null,
+    val clan: PlayerClanDto? = null,
     val achievements: List<AchievementDto> = emptyList(),
 ) {
     /** "Games Champion" achievement value = lifetime clan games points. */
@@ -16,6 +18,13 @@ data class PlayerDto(
         const val ACHIEVEMENT_GAMES_CHAMPION = "Games Champion"
     }
 }
+
+@Serializable
+data class PlayerClanDto(
+    val tag: String? = null,
+    val name: String? = null,
+    val badgeUrls: BadgeUrlsDto? = null,
+)
 
 @Serializable
 data class AchievementDto(

@@ -18,9 +18,9 @@ import de.pixel.clashreminders.domain.ClanGamesCalendar
 import de.pixel.clashreminders.domain.ReminderType
 
 /**
- * Takes the "Games Champion" achievement baseline for every member of every
- * clan with an enabled clan games reminder — the bot's achievement_data
- * snapshot at window start (22nd 07:00 UTC).
+ * Takes the "Games Champion" achievement baseline for every account at the
+ * start of the clan games window (22nd 07:00 UTC). Account-based, so only
+ * a handful of player fetches instead of whole clan member lists.
  */
 class ClanGamesSnapshotWorker(
     appContext: Context,
@@ -37,36 +37,27 @@ class ClanGamesSnapshotWorker(
             Log.d(AlarmScheduler.TAG, "Snapshot skipped: outside clan games window")
             return Result.success()
         }
+        val hasCgReminder = database.reminderDao()
+            .getAllEnabled()
+            .any { it.type == ReminderType.CLAN_GAMES_END }
+        if (!hasCgReminder) return Result.success()
 
-        for (clan in database.clanDao().getAll()) {
-            val hasCgReminder = database.reminderDao()
-                .getEnabledForClan(clan.tag)
-                .any { it.type == ReminderType.CLAN_GAMES_END }
-            if (!hasCgReminder) continue
-
-            val members = api.getClan(clan.tag).valueOrNull()?.memberList
-            if (members == null) {
-                Log.w(AlarmScheduler.TAG, "Snapshot: clan fetch failed for ${clan.tag}")
-                continue
+        val accounts = database.accountDao().getAll()
+        val snapshots = accounts.mapNotNull { account ->
+            api.getPlayer(account.tag).valueOrNull()?.clanGamesPoints()?.let { points ->
+                ClanGamesSnapshotEntity(
+                    playerTag = account.tag,
+                    points = points,
+                    windowKey = window.windowKey,
+                    takenAt = now,
+                )
             }
-            val snapshots = members.mapNotNull { member ->
-                api.getPlayer(member.tag).valueOrNull()?.clanGamesPoints()?.let { points ->
-                    ClanGamesSnapshotEntity(
-                        clanTag = clan.tag,
-                        playerTag = member.tag,
-                        playerName = member.name,
-                        points = points,
-                        windowKey = window.windowKey,
-                        takenAt = now,
-                    )
-                }
-            }
-            database.snapshotDao().insertAll(snapshots)
-            Log.d(
-                AlarmScheduler.TAG,
-                "Snapshot stored for ${clan.tag}: ${snapshots.size}/${members.size} members"
-            )
         }
+        database.snapshotDao().insertAll(snapshots)
+        Log.d(
+            AlarmScheduler.TAG,
+            "CG snapshot stored: ${snapshots.size}/${accounts.size} accounts"
+        )
         return Result.success()
     }
 

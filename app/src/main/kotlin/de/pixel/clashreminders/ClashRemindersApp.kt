@@ -5,7 +5,7 @@ import androidx.work.Configuration
 import androidx.work.WorkManager
 import de.pixel.clashreminders.api.CocApiClient
 import de.pixel.clashreminders.data.db.AppDatabase
-import de.pixel.clashreminders.data.repository.ClanRepository
+import de.pixel.clashreminders.data.repository.AccountRepository
 import de.pixel.clashreminders.data.repository.SettingsRepository
 import de.pixel.clashreminders.notification.NotificationHelper
 import de.pixel.clashreminders.scheduling.AlarmScheduler
@@ -20,8 +20,8 @@ class ClashRemindersApp : Application(), Configuration.Provider {
 
     val apiClient by lazy { CocApiClient { settingsRepository.apiKeyOnce() } }
 
-    val clanRepository by lazy {
-        ClanRepository(database.clanDao(), database.reminderDao(), apiClient)
+    val accountRepository by lazy {
+        AccountRepository(database.accountDao(), database.reminderDao(), apiClient)
     }
 
     val notificationHelper by lazy { NotificationHelper(this) }

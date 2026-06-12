@@ -1,11 +1,15 @@
 package de.pixel.clashreminders.domain
 
-import de.pixel.clashreminders.api.dto.ClanMemberDto
 import de.pixel.clashreminders.api.dto.CurrentWarDto
 import de.pixel.clashreminders.api.dto.LeagueGroupDto
-import de.pixel.clashreminders.api.dto.RaidMemberDto
 import de.pixel.clashreminders.api.dto.RaidSeasonDto
 import de.pixel.clashreminders.api.dto.WarClanDto
+
+/** Minimal account reference so the pure analysis logic stays entity-free. */
+data class AccountRef(
+    val tag: String,
+    val name: String,
+)
 
 /** A war member with fewer attacks than required. */
 data class OpenWarAttacker(
@@ -16,7 +20,10 @@ data class OpenWarAttacker(
     val mapPosition: Int,
 )
 
-/** Port of buildCWMissedAttacksMessage / the CWL day handler in ListeningEvent.java. */
+/**
+ * War analysis centered on the user's own accounts: reminders only care
+ * about attacks the user can still do themselves.
+ */
 object WarAnalysis {
 
     const val DEFAULT_ATTACKS_PER_MEMBER = 2
@@ -34,8 +41,25 @@ object WarAnalysis {
 
     fun isOurWar(war: CurrentWarDto, clanTag: String): Boolean = ourSide(war, clanTag) != null
 
-    fun openAttackers(side: WarClanDto, requiredAttacks: Int): List<OpenWarAttacker> =
-        side.members
+    /** The given accounts that are part of this war's lineup. */
+    fun accountsInRoster(side: WarClanDto, accounts: List<AccountRef>): List<AccountRef> {
+        val rosterTags = side.members.map { it.tag }.toSet()
+        return accounts.filter { it.tag in rosterTags }
+    }
+
+    /**
+     * Of the user's accounts, those in the lineup with attacks left,
+     * sorted by map position. Accounts not in the lineup are not listed —
+     * they have nothing to do in this war.
+     */
+    fun openAccountAttacks(
+        side: WarClanDto,
+        requiredAttacks: Int,
+        accounts: List<AccountRef>,
+    ): List<OpenWarAttacker> {
+        val accountTags = accounts.map { it.tag }.toSet()
+        return side.members
+            .filter { it.tag in accountTags }
             .map {
                 OpenWarAttacker(
                     tag = it.tag,
@@ -47,6 +71,7 @@ object WarAnalysis {
             }
             .filter { it.attacks < it.required }
             .sortedBy { it.mapPosition }
+    }
 }
 
 object CwlAnalysis {
@@ -61,20 +86,34 @@ object CwlAnalysis {
 
 object RaidAnalysis {
 
-    data class Result(
-        /** Clan members that never joined the raid. */
-        val notAttacked: List<ClanMemberDto>,
-        /** Raid participants with attacks left (attackLimit + bonusAttackLimit). */
-        val openAttacks: List<RaidMemberDto>,
+    /** Regular + bonus attacks a member can make at most per raid weekend. */
+    const val MAX_ATTACKS_PER_MEMBER = 6
+
+    data class AccountRaidStatus(
+        val tag: String,
+        val name: String,
+        val attacks: Int,
+        val limit: Int,
     ) {
-        val allDone: Boolean get() = notAttacked.isEmpty() && openAttacks.isEmpty()
+        val open: Boolean get() = attacks < limit
     }
 
-    fun analyze(clanMembers: List<ClanMemberDto>, raid: RaidSeasonDto): Result {
+    /**
+     * Raid progress for each of the user's accounts in this clan's raid.
+     * Accounts that have not joined the raid yet count as 0 attacks used.
+     */
+    fun accountStatuses(accounts: List<AccountRef>, raid: RaidSeasonDto): List<AccountRaidStatus> {
         val raidByTag = raid.members.associateBy { it.tag }
-        val notAttacked = clanMembers.filter { it.tag !in raidByTag }
-        val openAttacks = raid.members.filter { it.attacks < it.attackLimit + it.bonusAttackLimit }
-        return Result(notAttacked, openAttacks)
+        return accounts.map { account ->
+            val member = raidByTag[account.tag]
+            AccountRaidStatus(
+                tag = account.tag,
+                name = account.name,
+                attacks = member?.attacks ?: 0,
+                limit = member?.let { it.attackLimit + it.bonusAttackLimit }
+                    ?: MAX_ATTACKS_PER_MEMBER,
+            )
+        }
     }
 }
 
@@ -90,8 +129,8 @@ object ClanGamesAnalysis {
     )
 
     /**
-     * Members below the threshold, port of handleClanGamesEvent: diff of the
-     * "Games Champion" achievement against the window-start snapshot.
+     * Accounts below the threshold: diff of the "Games Champion" achievement
+     * against the window-start snapshot.
      */
     fun belowThreshold(
         currentPoints: List<MemberProgress>,

@@ -15,6 +15,9 @@ interface ScheduledAlarmDao {
     @Query("DELETE FROM scheduled_alarms WHERE requestCode = :requestCode")
     suspend fun delete(requestCode: Int)
 
+    @Query("DELETE FROM scheduled_alarms WHERE reminderId = :reminderId AND eventKey = :eventKey")
+    suspend fun deleteByEvent(reminderId: Long, eventKey: String)
+
     @Query("SELECT * FROM scheduled_alarms")
     suspend fun getAll(): List<ScheduledAlarmEntity>
 }

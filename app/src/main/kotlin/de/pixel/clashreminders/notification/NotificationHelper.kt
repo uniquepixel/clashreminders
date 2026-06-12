@@ -52,12 +52,10 @@ class NotificationHelper(private val context: Context) {
         notificationId: Int,
         channelId: String,
         content: ReminderContentBuilder.Content,
-        clanTag: String?,
     ) {
         if (!canNotify()) return
         val openIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            clanTag?.let { putExtra(EXTRA_CLAN_TAG, it) }
         }
         val contentIntent = PendingIntent.getActivity(
             context,
@@ -89,7 +87,13 @@ class NotificationHelper(private val context: Context) {
         const val CHANNEL_REMINDERS = "reminders"
         const val CHANNEL_WAR_START = "war_start"
         const val CHANNEL_SERVICE = "service"
-        const val EXTRA_CLAN_TAG = "clanTag"
         const val WORK_NOTIFICATION_ID = 100_000
+
+        /**
+         * Stable notification id per reminder + clan, so one reminder can
+         * show one notification per clan (war/CWL) without collisions.
+         */
+        fun notificationId(reminderId: Long, clanTag: String?): Int =
+            (reminderId * 31 + (clanTag?.hashCode() ?: 0).toLong()).toInt()
     }
 }

@@ -22,15 +22,12 @@ interface ReminderDao {
     @Query("SELECT * FROM reminders WHERE id = :id")
     suspend fun getById(id: Long): ReminderEntity?
 
-    @Query("SELECT * FROM reminders WHERE clanTag = :clanTag ORDER BY type, offsetMinutes")
-    fun observeForClan(clanTag: String): Flow<List<ReminderEntity>>
-
-    @Query("SELECT * FROM reminders WHERE clanTag = :clanTag AND enabled = 1")
-    suspend fun getEnabledForClan(clanTag: String): List<ReminderEntity>
+    @Query("SELECT * FROM reminders ORDER BY type, offsetMinutes")
+    fun observeAll(): Flow<List<ReminderEntity>>
 
     @Query("SELECT * FROM reminders WHERE enabled = 1")
     suspend fun getAllEnabled(): List<ReminderEntity>
 
-    @Query("SELECT * FROM reminders")
-    fun observeAll(): Flow<List<ReminderEntity>>
+    @Query("SELECT COUNT(*) FROM reminders")
+    suspend fun count(): Int
 }

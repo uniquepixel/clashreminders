@@ -4,56 +4,70 @@
 
     <!-- Notification channels -->
     <string name="channel_reminders_name">Reminders</string>
-    <string name="channel_reminders_description">Reminders for open attacks in war, CWL, raid weekend and clan games</string>
+    <string name="channel_reminders_description">Reminders when your accounts still have open attacks in war, CWL, raid weekend or clan games</string>
     <string name="channel_war_start_name">War start</string>
-    <string name="channel_war_start_description">Notifications when a new clan war is found</string>
+    <string name="channel_war_start_description">Notifications when a new clan war with one of your accounts is found</string>
 
     <!-- Notification content -->
     <string name="notif_war_end_title">%1$s – Clan War – %2$s left</string>
-    <string name="notif_war_end_all_done">All attacks done – well played!</string>
     <string name="notif_war_member_line">%1$s (%2$d/%3$d)</string>
     <string name="notif_war_start_title">%1$s – War found</string>
     <string name="notif_war_start_preparation">Preparation day has begun.</string>
     <string name="notif_war_start_battle">Battle day has begun!</string>
+    <string name="notif_war_start_accounts">In the lineup: %1$s</string>
     <string name="notif_cwl_title">%1$s – CWL day – %2$s left</string>
-    <string name="notif_cwl_all_done">All CWL attacks done!</string>
-    <string name="notif_raid_title">%1$s – Raid weekend – %2$s left</string>
-    <string name="notif_raid_not_attacked">Not attacked:</string>
-    <string name="notif_raid_open_attacks">Open attacks:</string>
-    <string name="notif_raid_member_line">%1$s: %2$d/%3$d</string>
-    <string name="notif_raid_all_done">All raid attacks done!</string>
-    <string name="notif_cg_title">%1$s – Clan Games – %2$s left</string>
-    <string name="notif_cg_member_line">%1$s: %2$d points</string>
+    <string name="notif_raid_title">Raid weekend – %1$s left</string>
+    <string name="notif_raid_member_line">%1$s: %2$d/%3$d attacks</string>
+    <string name="notif_cg_title">Clan Games – %1$s left</string>
+    <string name="notif_cg_member_line">%1$s: %2$d/%3$d points</string>
     <string name="notif_cg_no_baseline">%1$s: (no start value)</string>
     <string name="notif_degraded_text">Could not load fresh data – check open attacks in the game.</string>
     <string name="notif_remaining_hours_minutes">%1$dh %2$dm</string>
     <string name="notif_remaining_minutes">%1$dm</string>
 
-    <!-- Clan list -->
-    <string name="clan_list_title">Clans</string>
-    <string name="clan_list_empty">No clans yet. Add your first clan to get reminders.</string>
-    <string name="clan_list_add">Add clan</string>
-    <string name="clan_list_refresh">Refresh</string>
-    <string name="clan_list_settings">Settings</string>
-    <string name="clan_list_reminders_count">%1$d reminders active</string>
-    <string name="clan_status_war">War: %1$s</string>
-    <string name="clan_status_no_war">No active war</string>
-    <string name="clan_status_loading">Loading status…</string>
-    <string name="war_state_preparation">preparation day</string>
-    <string name="war_state_in_war">battle day</string>
-    <string name="war_state_ended">ended</string>
+    <!-- Tabs -->
+    <string name="tab_accounts">Accounts</string>
+    <string name="tab_reminders">Reminders</string>
+    <string name="tab_settings">Settings</string>
 
-    <!-- Clan detail -->
-    <string name="clan_detail_reminders">Reminders</string>
-    <string name="clan_detail_add_reminder">Add reminder</string>
-    <string name="clan_detail_delete_clan">Remove clan</string>
-    <string name="clan_detail_delete_clan_confirm">Remove this clan and all of its reminders?</string>
-    <string name="clan_detail_no_reminders">No reminders configured for this clan yet.</string>
+    <!-- Home / accounts -->
+    <string name="home_title">My accounts</string>
+    <string name="home_refresh">Refresh</string>
+    <string name="home_add_account">Add account</string>
+    <string name="home_empty">No accounts yet. Add your player tag to get reminders for your accounts.</string>
+    <string name="home_no_clan">No clan</string>
+    <string name="home_status_loading">Loading status…</string>
+    <string name="home_status_nothing_open">No active events right now.</string>
+    <string name="home_delete_account">Remove account</string>
+    <string name="home_delete_account_confirm">Remove %1$s? Reminders will no longer cover this account.</string>
+    <string name="home_chip_war">War %1$d/%2$d</string>
+    <string name="home_chip_war_preparation">War: preparation</string>
+    <string name="home_chip_raid">Raid %1$d/%2$d</string>
+    <string name="home_chip_cg">Games %1$d pts</string>
+    <string name="home_chip_cg_unknown">Games: no start value</string>
+
+    <!-- Add account -->
+    <string name="add_account_title">Add account</string>
+    <string name="add_account_hint">Enter the player tag of your account. You can find it in the game on your profile.</string>
+    <string name="add_account_tag_label">Player tag</string>
+    <string name="add_account_tag_hint">#2PP0JCCL</string>
+    <string name="add_account_validate">Look up</string>
+    <string name="add_account_save">Add account</string>
+    <string name="add_account_not_found">Player not found – check the tag.</string>
+    <string name="add_account_forbidden">Access denied (403): check your API key and that IP 45.79.218.79 is whitelisted.</string>
+    <string name="add_account_network_error">Network error – please try again.</string>
+    <string name="add_account_already_added">This account is already added.</string>
+
+    <!-- Reminders -->
+    <string name="reminders_title">Reminders</string>
+    <string name="reminders_add">Add reminder</string>
+    <string name="reminders_explainer">Reminders apply to all of your accounts and all of their clans. You are only notified while one of your accounts still has something open – if everything is done, no notification is sent.</string>
+    <string name="reminders_empty">No reminders configured yet.</string>
     <string name="reminder_offset_before_war_end">%1$s before war end</string>
     <string name="reminder_offset_before_cwl_day_end">%1$s before CWL day end</string>
     <string name="reminder_offset_before_cg_end">%1$s before clan games end</string>
-    <string name="reminder_war_start_label">When a war is found</string>
-    <string name="reminder_raid_label">%1$s at %2$s</string>
+    <string name="reminder_war_start_label">When a war with your accounts is found</string>
+    <string name="reminder_raid_label">%1$s at %2$s, checks all your clans</string>
     <string name="reminder_delete">Delete reminder</string>
     <string name="reminder_fire_now">Fire now (debug)</string>
 
@@ -72,25 +86,13 @@
     <string name="add_reminder_offset_hint">Lead time before the event ends</string>
     <string name="add_reminder_raid_day">Weekend day</string>
     <string name="add_reminder_raid_time">Time</string>
-    <string name="add_reminder_cg_threshold">Points threshold</string>
+    <string name="add_reminder_cg_threshold">Points target per account</string>
     <string name="add_reminder_save">Save</string>
     <string name="add_reminder_cancel">Cancel</string>
     <string name="day_friday">Friday</string>
     <string name="day_saturday">Saturday</string>
     <string name="day_sunday">Sunday</string>
     <string name="day_monday">Monday</string>
-
-    <!-- Add clan -->
-    <string name="add_clan_title">Add clan</string>
-    <string name="add_clan_tag_label">Clan tag</string>
-    <string name="add_clan_tag_hint">#2PP0JCCL</string>
-    <string name="add_clan_validate">Look up</string>
-    <string name="add_clan_save">Add clan</string>
-    <string name="add_clan_defaults">Create default reminders (war end 2h, CWL day 2h, raid Sunday 18:00, clan games 24h)</string>
-    <string name="add_clan_not_found">Clan not found – check the tag.</string>
-    <string name="add_clan_forbidden">Access denied (403): check your API key and that IP 45.79.218.79 is whitelisted.</string>
-    <string name="add_clan_network_error">Network error – please try again.</string>
-    <string name="add_clan_already_added">This clan is already added.</string>
 
     <!-- Settings -->
     <string name="settings_title">Settings</string>
@@ -116,9 +118,9 @@
 
     <!-- Onboarding -->
     <string name="onboarding_welcome">Welcome to ClashReminders!</string>
-    <string name="onboarding_intro">Get notified about open war attacks, CWL hits, raid attacks and clan games – directly on your phone.</string>
+    <string name="onboarding_intro">Get reminded about open war attacks, CWL hits, raid attacks and clan games of your own accounts – directly on your phone.</string>
     <string name="onboarding_step_key">Step 1: Enter your Clash of Clans API key</string>
-    <string name="onboarding_step_clan">Step 2: Add your first clan</string>
+    <string name="onboarding_step_account">Step 2: Add your first account</string>
     <string name="onboarding_continue">Continue</string>
 
     <!-- Misc -->
