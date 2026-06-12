@@ -9,6 +9,8 @@ import de.pixel.clashreminders.ClashRemindersApp
 import de.pixel.clashreminders.api.dto.CurrentWarDto
 import de.pixel.clashreminders.api.dto.RaidSeasonDto
 import de.pixel.clashreminders.api.valueOrNull
+import de.pixel.clashreminders.data.db.entity.ClanSightingEntity
+import de.pixel.clashreminders.data.repository.AccountSync
 import de.pixel.clashreminders.domain.AccountRef
 import de.pixel.clashreminders.domain.ClanGamesCalendar
 import de.pixel.clashreminders.domain.RaidAnalysis
@@ -25,7 +27,7 @@ import kotlinx.coroutines.launch
 
 /** Live to-do status of one account, shown as chips on its card. */
 data class AccountStatus(
-    /** preparation/inWar when the account is in the current war lineup. */
+    /** preparation/inWar when the account is in a tracked clan's war lineup. */
     val warState: String? = null,
     val warAttacksDone: Int = 0,
     val warAttacksRequired: Int = 0,
@@ -66,54 +68,61 @@ class HomeViewModel(private val app: ClashRemindersApp) : ViewModel() {
                 for (account in app.database.accountDao().getAll()) {
                     val player = app.apiClient.getPlayer(account.tag).valueOrNull()
                     val fresh = if (player != null) {
-                        account.copy(
-                            name = player.name ?: account.name,
-                            townHallLevel = player.townHallLevel ?: account.townHallLevel,
-                            clanTag = player.clan?.tag,
-                            clanName = player.clan?.name,
-                            clanBadgeUrl = player.clan?.badgeUrls?.medium
-                                ?: player.clan?.badgeUrls?.small,
-                        ).also { if (it != account) app.database.accountDao().upsert(it) }
+                        AccountSync.applyPlayer(app.database, account, player, now)
                     } else {
                         account
                     }
+                    val ref = AccountRef(fresh.tag, fresh.name)
+
+                    // current clan first, then other clans seen in the last week —
+                    // the account can be in another clan's war lineup (hopping)
+                    val sightingTags = app.database.clanSightingDao()
+                        .getForAccount(fresh.tag)
+                        .filter { it.lastSeenAt >= now - ClanSightingEntity.RETENTION_MILLIS }
+                        .map { it.clanTag }
+                    val candidateClans = (listOfNotNull(fresh.clanTag) + sightingTags).distinct()
 
                     var status = AccountStatus()
-                    val clanTag = fresh.clanTag
-                    if (clanTag != null) {
+                    for (clanTag in candidateClans) {
                         val war = warCache.getOrPut(clanTag) {
                             app.apiClient.getCurrentWar(clanTag).valueOrNull()
-                        }
-                        val warActive = war?.state == CurrentWarDto.STATE_PREPARATION ||
-                            war?.state == CurrentWarDto.STATE_IN_WAR
-                        if (war != null && warActive) {
-                            val side = WarAnalysis.ourSide(war, clanTag)
-                            val member = side?.members?.firstOrNull { it.tag == fresh.tag }
-                            if (member != null) {
-                                status = status.copy(
-                                    warState = war.state,
-                                    warAttacksDone = member.attacks.size,
-                                    warAttacksRequired = WarAnalysis.requiredAttacks(war),
-                                )
-                            }
-                        }
-                        if (raidActive) {
+                        } ?: continue
+                        val warActive = war.state == CurrentWarDto.STATE_PREPARATION ||
+                            war.state == CurrentWarDto.STATE_IN_WAR
+                        if (!warActive) continue
+                        val side = WarAnalysis.ourSide(war, clanTag)
+                        val member = side?.members?.firstOrNull { it.tag == fresh.tag } ?: continue
+                        status = status.copy(
+                            warState = war.state,
+                            warAttacksDone = member.attacks.size,
+                            warAttacksRequired = WarAnalysis.requiredAttacks(war),
+                        )
+                        break
+                    }
+
+                    if (raidActive) {
+                        for (clanTag in candidateClans) {
                             val raid = raidCache.getOrPut(clanTag) {
                                 app.apiClient.getRaidSeasons(clanTag).valueOrNull()
                                     ?.items?.firstOrNull()
                                     ?.takeIf { it.state == RaidSeasonDto.STATE_ONGOING }
-                            }
-                            if (raid != null) {
-                                val raidStatus = RaidAnalysis
-                                    .accountStatuses(listOf(AccountRef(fresh.tag, fresh.name)), raid)
-                                    .first()
-                                status = status.copy(
-                                    raidAttacks = raidStatus.attacks,
-                                    raidLimit = raidStatus.limit,
-                                )
-                            }
+                            } ?: continue
+                            val raidStatus = if (clanTag == fresh.clanTag) {
+                                RaidAnalysis.accountStatuses(listOf(ref), raid).first()
+                            } else {
+                                // other clans only matter when the account joined
+                                // their raid and still has attacks open
+                                RaidAnalysis.participantStatuses(listOf(ref), raid)
+                                    .firstOrNull { it.open }
+                            } ?: continue
+                            status = status.copy(
+                                raidAttacks = raidStatus.attacks,
+                                raidLimit = raidStatus.limit,
+                            )
+                            break
                         }
                     }
+
                     if (cgWindow != null && player != null) {
                         val baseline = app.database.snapshotDao()
                             .getForPlayerWindow(fresh.tag, cgWindow.windowKey)?.points

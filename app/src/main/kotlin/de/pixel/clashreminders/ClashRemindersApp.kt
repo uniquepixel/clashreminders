@@ -10,6 +10,7 @@ import de.pixel.clashreminders.data.repository.SettingsRepository
 import de.pixel.clashreminders.notification.NotificationHelper
 import de.pixel.clashreminders.scheduling.AlarmScheduler
 import de.pixel.clashreminders.scheduling.AppWorkerFactory
+import de.pixel.clashreminders.scheduling.PresenceWorker
 import de.pixel.clashreminders.scheduling.RefreshWorker
 
 class ClashRemindersApp : Application(), Configuration.Provider {
@@ -21,7 +22,12 @@ class ClashRemindersApp : Application(), Configuration.Provider {
     val apiClient by lazy { CocApiClient { settingsRepository.apiKeyOnce() } }
 
     val accountRepository by lazy {
-        AccountRepository(database.accountDao(), database.reminderDao(), apiClient)
+        AccountRepository(
+            database.accountDao(),
+            database.reminderDao(),
+            database.clanSightingDao(),
+            apiClient,
+        )
     }
 
     val notificationHelper by lazy { NotificationHelper(this) }
@@ -40,6 +46,7 @@ class ClashRemindersApp : Application(), Configuration.Provider {
         notificationHelper.createChannels()
         WorkManager.initialize(this, workManagerConfiguration)
         RefreshWorker.schedulePeriodic(this)
+        PresenceWorker.schedulePeriodic(this)
         RefreshWorker.enqueueNow(this)
     }
 }

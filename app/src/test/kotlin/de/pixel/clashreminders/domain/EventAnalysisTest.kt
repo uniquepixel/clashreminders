@@ -133,6 +133,19 @@ class EventAnalysisTest {
     }
 
     @Test
+    fun `raid participant statuses ignore accounts that never joined this raid`() {
+        val raid = json.decodeFromString<RaidSeasonsDto>(raidJson).items.first()
+        // Bob joined and has attacks open; Carol never joined this clan's raid,
+        // so as a hopped-back visitor she is not listed here
+        val statuses = RaidAnalysis.participantStatuses(
+            listOf(AccountRef("#P2", "Bob"), AccountRef("#P3", "Carol")),
+            raid,
+        )
+        assertEquals(listOf("Bob"), statuses.map { it.name })
+        assertTrue(statuses.single().open)
+    }
+
+    @Test
     fun `raid statuses report all done`() {
         val raid = json.decodeFromString<RaidSeasonsDto>(raidJson).items.first()
         val statuses = RaidAnalysis.accountStatuses(listOf(AccountRef("#P1", "Alice")), raid)

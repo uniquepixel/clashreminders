@@ -138,7 +138,9 @@ class FireReminderWorker(
         val name = tracked?.name
             ?: accounts.firstOrNull { it.clanTag == tag }?.clanName
             ?: tag
-        return ClanTarget(tag, name, accounts.filter { it.clanTag == tag }.map { AccountRef(it.tag, it.name) })
+        // lineup checks run against ALL accounts: a hopped-back account can
+        // still be in this clan's war or CWL roster
+        return ClanTarget(tag, name, accounts.map { AccountRef(it.tag, it.name) })
     }
 
     private data class ClanTarget(val tag: String, val name: String, val accounts: List<AccountRef>)
@@ -255,15 +257,18 @@ class FireReminderWorker(
     }
 
     /**
-     * One raid reminder covers every clan the accounts are in: each clan's
-     * raid is fetched and only the user's accounts with attacks left are
-     * listed, grouped per clan.
+     * One raid reminder covers every tracked clan (current clans plus clans
+     * an account was seen in during the last week). Accounts currently in
+     * the clan count as "not attacked yet" when absent from the raid;
+     * hopped-back accounts only matter where they joined the raid and left
+     * attacks open. Everything is grouped per clan in one notification.
      */
     private suspend fun fetchRaid(accounts: List<AccountEntity>): Fetch {
-        val byClan = accounts
-            .filter { it.clanTag != null }
-            .groupBy { it.clanTag!! }
-        if (byClan.isEmpty()) return Fetch.SkipSilently
+        val trackedClans = database.trackedClanDao().getAll()
+        val nameByTag = trackedClans.associate { it.tag to it.name } +
+            accounts.mapNotNull { a -> a.clanTag?.let { it to (a.clanName ?: it) } }
+        val clanTags = (trackedClans.map { it.tag } + accounts.mapNotNull { it.clanTag }).distinct()
+        if (clanTags.isEmpty()) return Fetch.SkipSilently
 
         val perClan = mutableListOf<ReminderContentBuilder.ClanRaidOpen>()
         var anyOngoing = false
@@ -271,7 +276,7 @@ class FireReminderWorker(
         var remaining = 0L
         val now = System.currentTimeMillis()
 
-        for ((clanTag, clanAccounts) in byClan) {
+        for (clanTag in clanTags) {
             val raid = when (val result = api.getRaidSeasons(clanTag)) {
                 is ApiResult.Success -> result.value.items.firstOrNull()
                 is ApiResult.HttpError -> {
@@ -286,11 +291,13 @@ class FireReminderWorker(
             if (raid == null || raid.state != RaidSeasonDto.STATE_ONGOING) continue
             anyOngoing = true
             remaining = maxOf(remaining, (CocTime.parseMillisOrNull(raid.endTime) ?: now) - now)
-            val refs = clanAccounts.map { AccountRef(it.tag, it.name) }
-            val open = RaidAnalysis.accountStatuses(refs, raid).filter { it.open }
+            val inClan = accounts.filter { it.clanTag == clanTag }.map { AccountRef(it.tag, it.name) }
+            val visiting = accounts.filter { it.clanTag != clanTag }.map { AccountRef(it.tag, it.name) }
+            val open = (RaidAnalysis.accountStatuses(inClan, raid) +
+                RaidAnalysis.participantStatuses(visiting, raid))
+                .filter { it.open }
             if (open.isNotEmpty()) {
-                val clanName = clanAccounts.first().clanName ?: clanTag
-                perClan += ReminderContentBuilder.ClanRaidOpen(clanName, open)
+                perClan += ReminderContentBuilder.ClanRaidOpen(nameByTag[clanTag] ?: clanTag, open)
             }
         }
 

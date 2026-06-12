@@ -101,6 +101,7 @@ object RaidAnalysis {
     /**
      * Raid progress for each of the user's accounts in this clan's raid.
      * Accounts that have not joined the raid yet count as 0 attacks used.
+     * Use for accounts currently in the clan.
      */
     fun accountStatuses(accounts: List<AccountRef>, raid: RaidSeasonDto): List<AccountRaidStatus> {
         val raidByTag = raid.members.associateBy { it.tag }
@@ -113,6 +114,25 @@ object RaidAnalysis {
                 limit = member?.let { it.attackLimit + it.bonusAttackLimit }
                     ?: MAX_ATTACKS_PER_MEMBER,
             )
+        }
+    }
+
+    /**
+     * Raid progress only for accounts that actually joined this clan's raid.
+     * Use for accounts that are NOT currently in the clan (hopped back home):
+     * they only matter here if they started raiding and left attacks open.
+     */
+    fun participantStatuses(accounts: List<AccountRef>, raid: RaidSeasonDto): List<AccountRaidStatus> {
+        val raidByTag = raid.members.associateBy { it.tag }
+        return accounts.mapNotNull { account ->
+            raidByTag[account.tag]?.let { member ->
+                AccountRaidStatus(
+                    tag = account.tag,
+                    name = account.name,
+                    attacks = member.attacks,
+                    limit = member.attackLimit + member.bonusAttackLimit,
+                )
+            }
         }
     }
 }

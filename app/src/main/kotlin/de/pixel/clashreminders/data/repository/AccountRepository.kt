@@ -4,8 +4,10 @@ import de.pixel.clashreminders.api.ApiResult
 import de.pixel.clashreminders.api.CocApiClient
 import de.pixel.clashreminders.api.dto.PlayerDto
 import de.pixel.clashreminders.data.db.AccountDao
+import de.pixel.clashreminders.data.db.ClanSightingDao
 import de.pixel.clashreminders.data.db.ReminderDao
 import de.pixel.clashreminders.data.db.entity.AccountEntity
+import de.pixel.clashreminders.data.db.entity.ClanSightingEntity
 import de.pixel.clashreminders.data.db.entity.ReminderEntity
 import de.pixel.clashreminders.domain.ClanGamesAnalysis
 import de.pixel.clashreminders.domain.ReminderType
@@ -15,6 +17,7 @@ import java.time.DayOfWeek
 class AccountRepository(
     private val accountDao: AccountDao,
     private val reminderDao: ReminderDao,
+    private val clanSightingDao: ClanSightingDao,
     private val api: CocApiClient,
 ) {
 
@@ -43,12 +46,27 @@ class AccountRepository(
                 clanBadgeUrl = player.clan?.badgeUrls?.medium ?: player.clan?.badgeUrls?.small,
             )
         )
+        val clan = player.clan
+        if (clan?.tag != null) {
+            clanSightingDao.upsert(
+                ClanSightingEntity(
+                    accountTag = tag,
+                    clanTag = clan.tag,
+                    clanName = clan.name ?: clan.tag,
+                    clanBadgeUrl = clan.badgeUrls?.medium ?: clan.badgeUrls?.small,
+                    lastSeenAt = System.currentTimeMillis(),
+                )
+            )
+        }
         if (reminderDao.count() == 0) {
             defaultReminders().forEach { reminderDao.insert(it) }
         }
     }
 
-    suspend fun deleteAccount(tag: String) = accountDao.delete(tag)
+    suspend fun deleteAccount(tag: String) {
+        accountDao.delete(tag)
+        clanSightingDao.deleteForAccount(tag)
+    }
 
     suspend fun addReminder(reminder: ReminderEntity): Long = reminderDao.insert(reminder)
 

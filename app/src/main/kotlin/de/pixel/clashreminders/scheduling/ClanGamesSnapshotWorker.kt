@@ -13,6 +13,7 @@ import de.pixel.clashreminders.api.CocApiClient
 import de.pixel.clashreminders.api.valueOrNull
 import de.pixel.clashreminders.data.db.AppDatabase
 import de.pixel.clashreminders.data.db.entity.ClanGamesSnapshotEntity
+import de.pixel.clashreminders.data.repository.AccountSync
 import de.pixel.clashreminders.data.repository.SettingsRepository
 import de.pixel.clashreminders.domain.ClanGamesCalendar
 import de.pixel.clashreminders.domain.ReminderType
@@ -44,7 +45,9 @@ class ClanGamesSnapshotWorker(
 
         val accounts = database.accountDao().getAll()
         val snapshots = accounts.mapNotNull { account ->
-            api.getPlayer(account.tag).valueOrNull()?.clanGamesPoints()?.let { points ->
+            val player = api.getPlayer(account.tag).valueOrNull() ?: return@mapNotNull null
+            AccountSync.applyPlayer(database, account, player, now)
+            player.clanGamesPoints()?.let { points ->
                 ClanGamesSnapshotEntity(
                     playerTag = account.tag,
                     points = points,

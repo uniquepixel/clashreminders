@@ -7,6 +7,7 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import de.pixel.clashreminders.data.db.entity.AccountEntity
 import de.pixel.clashreminders.data.db.entity.ClanGamesSnapshotEntity
+import de.pixel.clashreminders.data.db.entity.ClanSightingEntity
 import de.pixel.clashreminders.data.db.entity.FiredEventEntity
 import de.pixel.clashreminders.data.db.entity.ReminderEntity
 import de.pixel.clashreminders.data.db.entity.ScheduledAlarmEntity
@@ -16,6 +17,7 @@ import de.pixel.clashreminders.data.db.entity.TrackedClanEntity
     entities = [
         AccountEntity::class,
         TrackedClanEntity::class,
+        ClanSightingEntity::class,
         ReminderEntity::class,
         FiredEventEntity::class,
         ClanGamesSnapshotEntity::class,
@@ -29,6 +31,7 @@ abstract class AppDatabase : RoomDatabase() {
 
     abstract fun accountDao(): AccountDao
     abstract fun trackedClanDao(): TrackedClanDao
+    abstract fun clanSightingDao(): ClanSightingDao
     abstract fun reminderDao(): ReminderDao
     abstract fun firedEventDao(): FiredEventDao
     abstract fun snapshotDao(): SnapshotDao
