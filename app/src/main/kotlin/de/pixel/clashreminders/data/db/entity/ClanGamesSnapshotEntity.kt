@@ -5,18 +5,17 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
- * "Games Champion" achievement value per member at the start of a clan games
- * window. Diffed against the live value when the reminder fires.
+ * "Games Champion" achievement value per account at the start of a clan
+ * games window. Diffed against the live value when the reminder fires.
+ * Account-based, so only the user's own accounts need to be snapshotted.
  */
 @Entity(
     tableName = "cg_snapshots",
-    indices = [Index(value = ["clanTag", "playerTag", "windowKey"], unique = true)],
+    indices = [Index(value = ["playerTag", "windowKey"], unique = true)],
 )
 data class ClanGamesSnapshotEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val clanTag: String,
     val playerTag: String,
-    val playerName: String,
     val points: Int,
     /** Clan games window key, e.g. "2026-06". */
     val windowKey: String,

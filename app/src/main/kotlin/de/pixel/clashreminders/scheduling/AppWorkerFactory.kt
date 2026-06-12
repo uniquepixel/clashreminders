@@ -26,6 +26,8 @@ class AppWorkerFactory(
             RefreshWorker(appContext, workerParameters, database, settingsRepository, api, notificationHelper, alarmScheduler)
         FireReminderWorker::class.java.name ->
             FireReminderWorker(appContext, workerParameters, database, api, notificationHelper)
+        PresenceWorker::class.java.name ->
+            PresenceWorker(appContext, workerParameters, database, settingsRepository, api)
         ClanGamesSnapshotWorker::class.java.name ->
             ClanGamesSnapshotWorker(appContext, workerParameters, database, settingsRepository, api)
         else -> null

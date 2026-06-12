@@ -39,14 +39,43 @@ class EventAnalysisTest {
         }
     """.trimIndent()
 
+    private val mainAccount = AccountRef("#P2", "Bob")
+    private val secondAccount = AccountRef("#P3", "Carol")
+    private val outsiderAccount = AccountRef("#P9", "NotInWar")
+
     @Test
-    fun `openAttackers lists members below required attacks sorted by map position`() {
+    fun `openAccountAttacks lists only own accounts below required attacks`() {
         val war = json.decodeFromString<CurrentWarDto>(warJson)
         val side = WarAnalysis.ourSide(war, "#AAA")!!
-        val open = WarAnalysis.openAttackers(side, WarAnalysis.requiredAttacks(war))
+        val open = WarAnalysis.openAccountAttacks(
+            side,
+            WarAnalysis.requiredAttacks(war),
+            listOf(mainAccount, secondAccount, outsiderAccount),
+        )
+        // Alice (2/2) is not an own account; Bob (1/2) and Carol (0/2) are open
         assertEquals(listOf("Bob", "Carol"), open.map { it.name })
         assertEquals(listOf(1, 0), open.map { it.attacks })
         assertEquals(2, open.first().required)
+    }
+
+    @Test
+    fun `openAccountAttacks empty when all own accounts are done`() {
+        val war = json.decodeFromString<CurrentWarDto>(warJson)
+        val side = WarAnalysis.ourSide(war, "#AAA")!!
+        val open = WarAnalysis.openAccountAttacks(
+            side,
+            WarAnalysis.requiredAttacks(war),
+            listOf(AccountRef("#P1", "Alice")),
+        )
+        assertTrue(open.isEmpty())
+    }
+
+    @Test
+    fun `accountsInRoster ignores accounts outside the lineup`() {
+        val war = json.decodeFromString<CurrentWarDto>(warJson)
+        val side = WarAnalysis.ourSide(war, "#AAA")!!
+        val inRoster = WarAnalysis.accountsInRoster(side, listOf(mainAccount, outsiderAccount))
+        assertEquals(listOf("#P2"), inRoster.map { it.tag })
     }
 
     @Test
@@ -57,10 +86,14 @@ class EventAnalysisTest {
     }
 
     @Test
-    fun `cwl day requires one attack per member`() {
+    fun `cwl day requires one attack per account`() {
         val war = json.decodeFromString<CurrentWarDto>(warJson)
         val side = WarAnalysis.ourSide(war, "#AAA")!!
-        val open = WarAnalysis.openAttackers(side, WarAnalysis.CWL_ATTACKS_PER_DAY)
+        val open = WarAnalysis.openAccountAttacks(
+            side,
+            WarAnalysis.CWL_ATTACKS_PER_DAY,
+            listOf(mainAccount, secondAccount),
+        )
         assertEquals(listOf("Carol"), open.map { it.name })
     }
 
@@ -81,32 +114,46 @@ class EventAnalysisTest {
     """.trimIndent()
 
     @Test
-    fun `raid analysis separates non-participants from open attacks`() {
+    fun `raid statuses count missing participants as zero attacks`() {
         val raid = json.decodeFromString<RaidSeasonsDto>(raidJson).items.first()
-        val clanMembers = listOf(
-            de.pixel.clashreminders.api.dto.ClanMemberDto("#P1", "Alice"),
-            de.pixel.clashreminders.api.dto.ClanMemberDto("#P2", "Bob"),
-            de.pixel.clashreminders.api.dto.ClanMemberDto("#P3", "Carol"),
+        val statuses = RaidAnalysis.accountStatuses(
+            listOf(
+                AccountRef("#P1", "Alice"),
+                AccountRef("#P2", "Bob"),
+                AccountRef("#P3", "Carol"),
+            ),
+            raid,
         )
-        val result = RaidAnalysis.analyze(clanMembers, raid)
-        assertEquals(listOf("Carol"), result.notAttacked.map { it.name })
-        assertEquals(listOf("Bob"), result.openAttacks.map { it.name })
-        assertFalse(result.allDone)
+        // Alice 6/6 done, Bob 2/5 open, Carol not joined -> 0/6 open
+        assertEquals(listOf(false, true, true), statuses.map { it.open })
+        assertEquals(0, statuses.first { it.name == "Carol" }.attacks)
+        assertEquals(RaidAnalysis.MAX_ATTACKS_PER_MEMBER, statuses.first { it.name == "Carol" }.limit)
+        assertEquals(2, statuses.first { it.name == "Bob" }.attacks)
+        assertEquals(5, statuses.first { it.name == "Bob" }.limit)
     }
 
     @Test
-    fun `raid analysis reports all done`() {
+    fun `raid participant statuses ignore accounts that never joined this raid`() {
         val raid = json.decodeFromString<RaidSeasonsDto>(raidJson).items.first()
-        val clanMembers = listOf(
-            de.pixel.clashreminders.api.dto.ClanMemberDto("#P1", "Alice"),
+        // Bob joined and has attacks open; Carol never joined this clan's raid,
+        // so as a hopped-back visitor she is not listed here
+        val statuses = RaidAnalysis.participantStatuses(
+            listOf(AccountRef("#P2", "Bob"), AccountRef("#P3", "Carol")),
+            raid,
         )
-        // Alice has 6/6 attacks; with no other members nothing is open
-        val result = RaidAnalysis.analyze(clanMembers, raid.copy(members = raid.members.take(1)))
-        assertTrue(result.allDone)
+        assertEquals(listOf("Bob"), statuses.map { it.name })
+        assertTrue(statuses.single().open)
     }
 
     @Test
-    fun `clan games diff lists members below threshold and missing baselines`() {
+    fun `raid statuses report all done`() {
+        val raid = json.decodeFromString<RaidSeasonsDto>(raidJson).items.first()
+        val statuses = RaidAnalysis.accountStatuses(listOf(AccountRef("#P1", "Alice")), raid)
+        assertTrue(statuses.none { it.open })
+    }
+
+    @Test
+    fun `clan games diff lists accounts below threshold and missing baselines`() {
         val current = listOf(
             ClanGamesAnalysis.MemberProgress("#P1", "Alice", 55_000),
             ClanGamesAnalysis.MemberProgress("#P2", "Bob", 41_000),
@@ -121,9 +168,16 @@ class EventAnalysisTest {
     }
 
     @Test
-    fun `clan games diff empty when everyone reached the threshold`() {
+    fun `clan games diff empty when every account reached the threshold`() {
         val current = listOf(ClanGamesAnalysis.MemberProgress("#P1", "Alice", 55_000))
         val baseline = mapOf("#P1" to 50_000)
         assertTrue(ClanGamesAnalysis.belowThreshold(current, baseline, 4000).isEmpty())
+    }
+
+    @Test
+    fun `war analysis false data does not crash account filter`() {
+        val war = json.decodeFromString<CurrentWarDto>(warJson)
+        val side = WarAnalysis.ourSide(war, "#AAA")!!
+        assertFalse(WarAnalysis.openAccountAttacks(side, 2, emptyList()).isNotEmpty())
     }
 }

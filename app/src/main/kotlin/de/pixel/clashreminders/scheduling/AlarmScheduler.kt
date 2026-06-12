@@ -47,6 +47,7 @@ class AlarmScheduler(private val context: Context) {
             }
             putExtra(EXTRA_REMINDER_ID, alarm.reminderId)
             putExtra(EXTRA_EVENT_KEY, alarm.eventKey)
+            alarm.clanTag?.let { putExtra(EXTRA_CLAN_TAG, it) }
         }
         return PendingIntent.getBroadcast(
             context,
@@ -62,6 +63,7 @@ class AlarmScheduler(private val context: Context) {
         const val ACTION_CG_SNAPSHOT = "de.pixel.clashreminders.ACTION_CG_SNAPSHOT"
         const val EXTRA_REMINDER_ID = "reminderId"
         const val EXTRA_EVENT_KEY = "eventKey"
+        const val EXTRA_CLAN_TAG = "clanTag"
         private const val INEXACT_WINDOW_MILLIS = 15 * 60 * 1000L
     }
 }

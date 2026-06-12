@@ -10,7 +10,6 @@ class EventPlannerTest {
 
     private fun reminder(offsetMinutes: Int) = ReminderEntity(
         id = 7,
-        clanTag = "#TEST",
         type = ReminderType.WAR_END,
         offsetMinutes = offsetMinutes,
     )
@@ -19,11 +18,12 @@ class EventPlannerTest {
     fun `future fire time is scheduled`() {
         val now = 1_000_000_000_000L
         val end = now + 4 * 60 * 60 * 1000L
-        val outcome = EventPlanner.planOffsetReminder(reminder(120), end, "war-$end", now)
+        val outcome = EventPlanner.planOffsetReminder(reminder(120), end, "war-$end", now, "#TEST")
         assertTrue(outcome is EventPlanner.Outcome.Schedule)
         assertEquals(end - 120 * 60_000L, outcome.alarm.fireAtMillis)
         assertEquals("war-$end", outcome.alarm.eventKey)
         assertEquals(7L, outcome.alarm.reminderId)
+        assertEquals("#TEST", outcome.alarm.clanTag)
     }
 
     @Test

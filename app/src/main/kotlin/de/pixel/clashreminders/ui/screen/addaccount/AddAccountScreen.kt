@@ -1,4 +1,4 @@
-package de.pixel.clashreminders.ui.screen.addclan
+package de.pixel.clashreminders.ui.screen.addaccount
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -7,12 +7,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -34,16 +34,16 @@ import de.pixel.clashreminders.ui.component.ClanBadge
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddClanScreen(
+fun AddAccountScreen(
     app: ClashRemindersApp,
     onBack: () -> Unit,
     onSaved: () -> Unit,
-    viewModel: AddClanViewModel = viewModel(factory = AddClanViewModel.factory(app)),
+    viewModel: AddAccountViewModel = viewModel(factory = AddAccountViewModel.factory(app)),
 ) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.add_clan_title)) },
+                title = { Text(stringResource(R.string.add_account_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back))
@@ -56,11 +56,15 @@ fun AddClanScreen(
             modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            Text(
+                stringResource(R.string.add_account_hint),
+                style = MaterialTheme.typography.bodyMedium,
+            )
             OutlinedTextField(
                 value = viewModel.tagInput,
                 onValueChange = viewModel::onTagChanged,
-                label = { Text(stringResource(R.string.add_clan_tag_label)) },
-                placeholder = { Text(stringResource(R.string.add_clan_tag_hint)) },
+                label = { Text(stringResource(R.string.add_account_tag_label)) },
+                placeholder = { Text(stringResource(R.string.add_account_tag_hint)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -71,7 +75,7 @@ fun AddClanScreen(
                     viewModel.lookupState !is LookupState.Loading,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text(stringResource(R.string.add_clan_validate))
+                Text(stringResource(R.string.add_account_validate))
             }
 
             when (val state = viewModel.lookupState) {
@@ -86,29 +90,35 @@ fun AddClanScreen(
                             modifier = Modifier.padding(16.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            ClanBadge(state.clan.badgeUrls?.medium ?: state.clan.badgeUrls?.small)
+                            ClanBadge(
+                                state.player.clan?.badgeUrls?.medium
+                                    ?: state.player.clan?.badgeUrls?.small,
+                                modifier = Modifier.size(48.dp),
+                            )
                             Spacer(Modifier.width(16.dp))
                             Column {
-                                Text(state.clan.name, style = MaterialTheme.typography.titleMedium)
-                                Text(state.clan.tag, style = MaterialTheme.typography.bodySmall)
+                                Text(
+                                    state.player.name ?: state.player.tag.orEmpty(),
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
+                                Text(
+                                    state.player.tag.orEmpty(),
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                                Text(
+                                    state.player.clan?.name
+                                        ?: stringResource(R.string.home_no_clan),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
                             }
                         }
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(
-                            checked = viewModel.createDefaults,
-                            onCheckedChange = { viewModel.createDefaults = it },
-                        )
-                        Text(
-                            stringResource(R.string.add_clan_defaults),
-                            style = MaterialTheme.typography.bodySmall,
-                        )
                     }
                     Button(
                         onClick = { viewModel.save(onSaved) },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text(stringResource(R.string.add_clan_save))
+                        Text(stringResource(R.string.add_account_save))
                     }
                 }
                 is LookupState.Idle -> Unit

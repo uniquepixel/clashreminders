@@ -26,7 +26,7 @@ import de.pixel.clashreminders.R
 import de.pixel.clashreminders.scheduling.RefreshWorker
 import kotlinx.coroutines.launch
 
-/** Step 1 of onboarding: explain the app, collect the API key, then continue to add-clan. */
+/** Step 1 of onboarding: explain the app, collect the API key, then continue to add-account. */
 @Composable
 fun OnboardingScreen(
     app: ClashRemindersApp,

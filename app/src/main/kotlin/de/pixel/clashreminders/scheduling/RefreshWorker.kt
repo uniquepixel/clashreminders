@@ -18,11 +18,15 @@ import de.pixel.clashreminders.api.dto.CurrentWarDto
 import de.pixel.clashreminders.api.dto.LeagueGroupDto
 import de.pixel.clashreminders.api.valueOrNull
 import de.pixel.clashreminders.data.db.AppDatabase
-import de.pixel.clashreminders.data.db.entity.ClanEntity
+import de.pixel.clashreminders.data.db.entity.AccountEntity
+import de.pixel.clashreminders.data.db.entity.ClanSightingEntity
 import de.pixel.clashreminders.data.db.entity.FiredEventEntity
 import de.pixel.clashreminders.data.db.entity.ReminderEntity
 import de.pixel.clashreminders.data.db.entity.ScheduledAlarmEntity
+import de.pixel.clashreminders.data.db.entity.TrackedClanEntity
+import de.pixel.clashreminders.data.repository.AccountSync
 import de.pixel.clashreminders.data.repository.SettingsRepository
+import de.pixel.clashreminders.domain.AccountRef
 import de.pixel.clashreminders.domain.ClanGamesCalendar
 import de.pixel.clashreminders.domain.CocTime
 import de.pixel.clashreminders.domain.CwlAnalysis
@@ -36,10 +40,12 @@ import java.time.ZoneId
 import java.util.concurrent.TimeUnit
 
 /**
- * Tier 1 of the background strategy (the bot's 2-minute polling loop,
- * adapted for mobile): periodically fetches event end times per clan,
- * fires war-start notifications on state transitions and (re)arms exact
- * alarms for everything else.
+ * Tier 1 of the background strategy, account-based: refreshes the user's
+ * accounts (name, clan membership), derives the set of clans to track from
+ * them, fires war-start notifications on state transitions when an account
+ * is in the lineup, and (re)arms exact alarms for everything else. War and
+ * CWL alarms are armed per clan with a running war; raid and clan games
+ * alarms are global and check all accounts when they fire.
  */
 class RefreshWorker(
     appContext: Context,
@@ -51,11 +57,22 @@ class RefreshWorker(
     private val alarmScheduler: AlarmScheduler,
 ) : CoroutineWorker(appContext, params) {
 
-    private val clanDao = database.clanDao()
+    private val accountDao = database.accountDao()
+    private val trackedClanDao = database.trackedClanDao()
+    private val clanSightingDao = database.clanSightingDao()
     private val reminderDao = database.reminderDao()
     private val firedEventDao = database.firedEventDao()
     private val snapshotDao = database.snapshotDao()
     private val scheduledAlarmDao = database.scheduledAlarmDao()
+
+    /** Alarm wish without a request code — reconcile() assigns stable codes. */
+    private data class DesiredAlarm(
+        val reminderId: Long,
+        val clanTag: String?,
+        val type: ReminderType,
+        val fireAtMillis: Long,
+        val eventKey: String,
+    )
 
     override suspend fun doWork(): Result {
         if (settings.apiKeyOnce() == null) {
@@ -63,20 +80,24 @@ class RefreshWorker(
             return Result.success()
         }
         val now = System.currentTimeMillis()
+        val accounts = refreshAccounts(now)
+        val clans = syncTrackedClans(accounts, now)
+        val reminders = reminderDao.getAllEnabled()
         val existing = scheduledAlarmDao.getAll()
-        val desired = mutableListOf<ScheduledAlarmEntity>()
-        var anyCgReminder = false
+        val desired = mutableListOf<DesiredAlarm>()
 
-        for (clan in clanDao.getAll()) {
-            val reminders = reminderDao.getEnabledForClan(clan.tag)
-            planWar(clan, reminders, existing, desired, now)
-            planCwl(clan, reminders, existing, desired, now)
-            planRaid(clan, reminders, desired, now)
-            anyCgReminder = planClanGames(clan, reminders, desired, now) || anyCgReminder
-        }
-
-        if (anyCgReminder) {
-            planSnapshotAlarm(desired, now)
+        if (accounts.isNotEmpty()) {
+            // lineup checks run against ALL accounts: a hopped-back account
+            // can still be in another clan's war or CWL roster
+            val accountRefs = accounts.map { AccountRef(it.tag, it.name) }
+            for (clan in clans) {
+                planWar(clan, accountRefs, reminders, existing, desired, now)
+                planCwl(clan, accountRefs, reminders, existing, desired, now)
+            }
+            planRaid(reminders, desired, now)
+            if (planClanGames(accounts, reminders, desired, now)) {
+                planSnapshotAlarm(desired, now)
+            }
         }
 
         reconcile(existing, desired)
@@ -88,13 +109,61 @@ class RefreshWorker(
         return Result.success()
     }
 
+    // --- Accounts & derived clans ----------------------------------------
+
+    /**
+     * Re-resolves every account (profile + clan sighting); keeps stored
+     * data when the fetch fails.
+     */
+    private suspend fun refreshAccounts(now: Long): List<AccountEntity> {
+        val refreshed = mutableListOf<AccountEntity>()
+        for (account in accountDao.getAll()) {
+            val player = api.getPlayer(account.tag).valueOrNull()
+            refreshed += if (player == null) {
+                account
+            } else {
+                AccountSync.applyPlayer(database, account, player, now)
+            }
+        }
+        return refreshed
+    }
+
+    /**
+     * The tracked clan set follows the sightings automatically: a clan is
+     * checked while at least one account was seen in it during the last
+     * week — that covers hopping over to another clan just for war hits.
+     * After the retention window the clan drops out on its own. Existing
+     * rows keep their lastWarState memory.
+     */
+    private suspend fun syncTrackedClans(
+        accounts: List<AccountEntity>,
+        now: Long,
+    ): List<TrackedClanEntity> {
+        clanSightingDao.deleteOlderThan(now - ClanSightingEntity.RETENTION_MILLIS)
+        val sightings = clanSightingDao.getAll()
+        if (sightings.isEmpty()) {
+            trackedClanDao.deleteAll()
+            return emptyList()
+        }
+        for ((tag, clanSightings) in sightings.groupBy { it.clanTag }) {
+            val newest = clanSightings.maxBy { it.lastSeenAt }
+            trackedClanDao.insertIfAbsent(
+                TrackedClanEntity(tag = tag, name = newest.clanName, badgeUrl = newest.clanBadgeUrl)
+            )
+            trackedClanDao.updateInfo(tag, newest.clanName, newest.clanBadgeUrl)
+        }
+        trackedClanDao.deleteAllExcept(sightings.map { it.clanTag }.distinct())
+        return trackedClanDao.getAll()
+    }
+
     // --- Clan War ------------------------------------------------------
 
     private suspend fun planWar(
-        clan: ClanEntity,
+        clan: TrackedClanEntity,
+        accounts: List<AccountRef>,
         reminders: List<ReminderEntity>,
         existing: List<ScheduledAlarmEntity>,
-        desired: MutableList<ScheduledAlarmEntity>,
+        desired: MutableList<DesiredAlarm>,
         now: Long,
     ) {
         val warEndReminders = reminders.filter { it.type == ReminderType.WAR_END }
@@ -104,15 +173,17 @@ class RefreshWorker(
         when (val result = api.getCurrentWar(clan.tag)) {
             is ApiResult.Success -> {
                 val war = result.value
-                handleWarStartTransition(clan, war, warStartReminders)
-                clanDao.updateLastWarState(clan.tag, war.state ?: CurrentWarDto.STATE_NOT_IN_WAR)
+                handleWarStartTransition(clan, war, warStartReminders, accounts)
+                trackedClanDao.updateLastWarState(clan.tag, war.state ?: CurrentWarDto.STATE_NOT_IN_WAR)
 
                 val endMillis = CocTime.parseMillisOrNull(war.endTime)
                 val warActive = war.state == CurrentWarDto.STATE_PREPARATION ||
                     war.state == CurrentWarDto.STATE_IN_WAR
-                if (warActive && endMillis != null) {
-                    val eventKey = "war-$endMillis"
-                    warEndReminders.forEach { planOutcome(it, endMillis, eventKey, now, desired) }
+                if (warActive && endMillis != null && anyAccountInLineup(war, clan.tag, accounts)) {
+                    val eventKey = "war-${clan.tag}-$endMillis"
+                    warEndReminders.forEach {
+                        planOutcome(it, endMillis, eventKey, now, clan.tag, desired)
+                    }
                 }
                 if (war.state == CurrentWarDto.STATE_PREPARATION) {
                     CocTime.parseMillisOrNull(war.startTime)?.let { start ->
@@ -123,30 +194,43 @@ class RefreshWorker(
             is ApiResult.HttpError -> {
                 if (result.code == 404) {
                     // war log private or no war — authoritative "not in war"
-                    clanDao.updateLastWarState(clan.tag, CurrentWarDto.STATE_NOT_IN_WAR)
+                    trackedClanDao.updateLastWarState(clan.tag, CurrentWarDto.STATE_NOT_IN_WAR)
                 } else {
-                    preserveExisting(existing, warEndReminders, desired)
+                    preserveExisting(existing, warEndReminders, clan.tag, desired)
                 }
             }
-            is ApiResult.NetworkError -> preserveExisting(existing, warEndReminders, desired)
+            is ApiResult.NetworkError -> preserveExisting(existing, warEndReminders, clan.tag, desired)
         }
     }
 
+    private fun anyAccountInLineup(
+        war: CurrentWarDto,
+        clanTag: String,
+        accounts: List<AccountRef>,
+    ): Boolean {
+        val side = WarAnalysis.ourSide(war, clanTag) ?: return false
+        return WarAnalysis.accountsInRoster(side, accounts).isNotEmpty()
+    }
+
     private suspend fun handleWarStartTransition(
-        clan: ClanEntity,
+        clan: TrackedClanEntity,
         war: CurrentWarDto,
         warStartReminders: List<ReminderEntity>,
+        accounts: List<AccountRef>,
     ) {
         if (!EventPlanner.isWarStartTransition(clan.lastWarState, war.state)) return
-        val eventKey = "warstart-" + (war.endTime ?: war.startTime ?: "unknown")
+        val side = WarAnalysis.ourSide(war, clan.tag) ?: return
+        // user-based: a war the user's accounts don't play in is not worth a ping
+        val rosterAccounts = WarAnalysis.accountsInRoster(side, accounts)
+        if (rosterAccounts.isEmpty()) return
+        val eventKey = "warstart-${clan.tag}-" + (war.endTime ?: war.startTime ?: "unknown")
         val contentBuilder = ReminderContentBuilder(applicationContext)
         for (reminder in warStartReminders) {
             if (firedEventDao.exists(reminder.id, eventKey)) continue
             notificationHelper.notify(
-                reminder.id.toInt(),
+                NotificationHelper.notificationId(reminder.id, clan.tag),
                 NotificationHelper.CHANNEL_WAR_START,
-                contentBuilder.warStart(clan.name, war.state),
-                clan.tag,
+                contentBuilder.warStart(clan.name, war.state, rosterAccounts.map { it.name }),
             )
             firedEventDao.insert(
                 FiredEventEntity(reminderId = reminder.id, eventKey = eventKey, firedAt = System.currentTimeMillis())
@@ -158,10 +242,11 @@ class RefreshWorker(
     // --- CWL -----------------------------------------------------------
 
     private suspend fun planCwl(
-        clan: ClanEntity,
+        clan: TrackedClanEntity,
+        accounts: List<AccountRef>,
         reminders: List<ReminderEntity>,
         existing: List<ScheduledAlarmEntity>,
-        desired: MutableList<ScheduledAlarmEntity>,
+        desired: MutableList<DesiredAlarm>,
         now: Long,
     ) {
         val cwlReminders = reminders.filter { it.type == ReminderType.CWL_DAY_END }
@@ -172,15 +257,16 @@ class RefreshWorker(
                 val group = result.value
                 if (!CwlAnalysis.isGroupActive(group)) return
                 val dayWar = resolveCurrentDayWar(group, clan.tag) ?: return
+                if (!anyAccountInLineup(dayWar, clan.tag, accounts)) return
                 val endMillis = CocTime.parseMillisOrNull(dayWar.endTime) ?: return
-                val eventKey = "cwl-$endMillis"
-                cwlReminders.forEach { planOutcome(it, endMillis, eventKey, now, desired) }
+                val eventKey = "cwl-${clan.tag}-$endMillis"
+                cwlReminders.forEach { planOutcome(it, endMillis, eventKey, now, clan.tag, desired) }
             }
             is ApiResult.HttpError -> {
-                if (result.code != 404) preserveExisting(existing, cwlReminders, desired)
+                if (result.code != 404) preserveExisting(existing, cwlReminders, clan.tag, desired)
                 // 404 = no league group, nothing to schedule
             }
-            is ApiResult.NetworkError -> preserveExisting(existing, cwlReminders, desired)
+            is ApiResult.NetworkError -> preserveExisting(existing, cwlReminders, clan.tag, desired)
         }
     }
 
@@ -207,9 +293,8 @@ class RefreshWorker(
     // --- Raid weekend (deterministic, no API) ---------------------------
 
     private suspend fun planRaid(
-        clan: ClanEntity,
         reminders: List<ReminderEntity>,
-        desired: MutableList<ScheduledAlarmEntity>,
+        desired: MutableList<DesiredAlarm>,
         now: Long,
     ) {
         val zone = ZoneId.systemDefault()
@@ -222,10 +307,9 @@ class RefreshWorker(
                 fireAt = RaidWeekend.nextFireTime(day, timeMinutes, fireAt, zone)
                 eventKey = RaidWeekend.weekendKey(fireAt, zone)
             }
-            desired += ScheduledAlarmEntity(
-                requestCode = reminder.id.toInt(),
+            desired += DesiredAlarm(
                 reminderId = reminder.id,
-                clanTag = clan.tag,
+                clanTag = null,
                 type = ReminderType.RAID,
                 fireAtMillis = fireAt,
                 eventKey = eventKey,
@@ -236,9 +320,9 @@ class RefreshWorker(
     // --- Clan games (deterministic window) ------------------------------
 
     private suspend fun planClanGames(
-        clan: ClanEntity,
+        accounts: List<AccountEntity>,
         reminders: List<ReminderEntity>,
-        desired: MutableList<ScheduledAlarmEntity>,
+        desired: MutableList<DesiredAlarm>,
         now: Long,
     ): Boolean {
         val cgReminders = reminders.filter { it.type == ReminderType.CLAN_GAMES_END }
@@ -246,25 +330,24 @@ class RefreshWorker(
 
         val window = ClanGamesCalendar.currentOrNextWindow(now)
         val eventKey = "cg-${window.windowKey}"
-        cgReminders.forEach { planOutcome(it, window.endUtcMillis, eventKey, now, desired) }
+        cgReminders.forEach { planOutcome(it, window.endUtcMillis, eventKey, now, null, desired) }
 
         // Catch-up: snapshot missed (app was off on the 22nd) but window is running
         val current = ClanGamesCalendar.currentWindow(now)
-        if (current != null && !snapshotDao.hasSnapshot(clan.tag, current.windowKey)) {
-            Log.d(AlarmScheduler.TAG, "CG snapshot missing for ${clan.tag}, catching up")
+        if (current != null && accounts.any { !snapshotDao.hasSnapshot(it.tag, current.windowKey) }) {
+            Log.d(AlarmScheduler.TAG, "CG snapshot missing for at least one account, catching up")
             ClanGamesSnapshotWorker.enqueue(applicationContext)
         }
         return true
     }
 
-    private fun planSnapshotAlarm(desired: MutableList<ScheduledAlarmEntity>, now: Long) {
+    private fun planSnapshotAlarm(desired: MutableList<DesiredAlarm>, now: Long) {
         val window = ClanGamesCalendar.currentOrNextWindow(now)
         val snapshotAt = window.startUtcMillis + 5 * 60_000L
         if (snapshotAt > now) {
-            desired += ScheduledAlarmEntity(
-                requestCode = ScheduledAlarmEntity.SNAPSHOT_REQUEST_CODE,
+            desired += DesiredAlarm(
                 reminderId = ScheduledAlarmEntity.SNAPSHOT_REMINDER_ID,
-                clanTag = "",
+                clanTag = null,
                 type = ReminderType.CLAN_GAMES_END,
                 fireAtMillis = snapshotAt,
                 eventKey = "snapshot-${window.windowKey}",
@@ -279,13 +362,20 @@ class RefreshWorker(
         eventEndMillis: Long,
         eventKey: String,
         now: Long,
-        desired: MutableList<ScheduledAlarmEntity>,
+        clanTag: String?,
+        desired: MutableList<DesiredAlarm>,
     ) {
         if (firedEventDao.exists(reminder.id, eventKey)) return
-        when (val outcome = EventPlanner.planOffsetReminder(reminder, eventEndMillis, eventKey, now)) {
-            is EventPlanner.Outcome.Schedule -> desired += outcome.alarm.toEntity()
+        when (val outcome = EventPlanner.planOffsetReminder(reminder, eventEndMillis, eventKey, now, clanTag)) {
+            is EventPlanner.Outcome.Schedule -> desired += DesiredAlarm(
+                reminderId = outcome.alarm.reminderId,
+                clanTag = outcome.alarm.clanTag,
+                type = outcome.alarm.type,
+                fireAtMillis = outcome.alarm.fireAtMillis,
+                eventKey = outcome.alarm.eventKey,
+            )
             is EventPlanner.Outcome.FireNow ->
-                FireReminderWorker.enqueue(applicationContext, reminder.id, eventKey)
+                FireReminderWorker.enqueue(applicationContext, reminder.id, eventKey, clanTag)
             is EventPlanner.Outcome.MarkFiredSilently ->
                 firedEventDao.insert(
                     FiredEventEntity(reminderId = reminder.id, eventKey = eventKey, firedAt = now)
@@ -293,28 +383,51 @@ class RefreshWorker(
         }
     }
 
-    /** On fetch failure, keep previously armed alarms instead of cancelling them. */
+    /** On fetch failure, keep previously armed alarms of this clan instead of cancelling them. */
     private fun preserveExisting(
         existing: List<ScheduledAlarmEntity>,
         reminders: List<ReminderEntity>,
-        desired: MutableList<ScheduledAlarmEntity>,
+        clanTag: String,
+        desired: MutableList<DesiredAlarm>,
     ) {
         val ids = reminders.map { it.id }.toSet()
-        desired += existing.filter { it.reminderId in ids }
+        desired += existing
+            .filter { it.reminderId in ids && it.clanTag == clanTag }
+            .map { DesiredAlarm(it.reminderId, it.clanTag, it.type, it.fireAtMillis, it.eventKey) }
     }
 
+    /**
+     * Cancels alarms that are no longer wanted and (re)arms the desired
+     * ones. Request codes stay stable per (reminderId, eventKey) so an
+     * existing PendingIntent is updated instead of duplicated.
+     */
     private suspend fun reconcile(
         existing: List<ScheduledAlarmEntity>,
-        desired: List<ScheduledAlarmEntity>,
+        desired: List<DesiredAlarm>,
     ) {
-        val desiredCodes = desired.map { it.requestCode }.toSet()
+        val desiredKeys = desired.map { it.reminderId to it.eventKey }.toSet()
         for (old in existing) {
-            if (old.requestCode !in desiredCodes) {
+            if ((old.reminderId to old.eventKey) !in desiredKeys) {
                 alarmScheduler.cancel(old)
                 scheduledAlarmDao.delete(old.requestCode)
             }
         }
-        for (alarm in desired) {
+        val codeByKey = existing.associate { (it.reminderId to it.eventKey) to it.requestCode }
+        var nextCode = (existing.maxOfOrNull { it.requestCode } ?: 0).coerceAtLeast(0) + 1
+        for (wish in desired) {
+            val requestCode = when {
+                wish.reminderId == ScheduledAlarmEntity.SNAPSHOT_REMINDER_ID ->
+                    ScheduledAlarmEntity.SNAPSHOT_REQUEST_CODE
+                else -> codeByKey[wish.reminderId to wish.eventKey] ?: nextCode++
+            }
+            val alarm = ScheduledAlarmEntity(
+                requestCode = requestCode,
+                reminderId = wish.reminderId,
+                clanTag = wish.clanTag,
+                type = wish.type,
+                fireAtMillis = wish.fireAtMillis,
+                eventKey = wish.eventKey,
+            )
             alarmScheduler.schedule(alarm)
             scheduledAlarmDao.upsert(alarm)
         }
@@ -366,12 +479,3 @@ class RefreshWorker(
         }
     }
 }
-
-private fun de.pixel.clashreminders.domain.PlannedAlarm.toEntity() = ScheduledAlarmEntity(
-    requestCode = reminderId.toInt(),
-    reminderId = reminderId,
-    clanTag = clanTag,
-    type = type,
-    fireAtMillis = fireAtMillis,
-    eventKey = eventKey,
-)

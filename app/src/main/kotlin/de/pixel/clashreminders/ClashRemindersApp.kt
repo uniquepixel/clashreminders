@@ -5,11 +5,12 @@ import androidx.work.Configuration
 import androidx.work.WorkManager
 import de.pixel.clashreminders.api.CocApiClient
 import de.pixel.clashreminders.data.db.AppDatabase
-import de.pixel.clashreminders.data.repository.ClanRepository
+import de.pixel.clashreminders.data.repository.AccountRepository
 import de.pixel.clashreminders.data.repository.SettingsRepository
 import de.pixel.clashreminders.notification.NotificationHelper
 import de.pixel.clashreminders.scheduling.AlarmScheduler
 import de.pixel.clashreminders.scheduling.AppWorkerFactory
+import de.pixel.clashreminders.scheduling.PresenceWorker
 import de.pixel.clashreminders.scheduling.RefreshWorker
 
 class ClashRemindersApp : Application(), Configuration.Provider {
@@ -20,8 +21,13 @@ class ClashRemindersApp : Application(), Configuration.Provider {
 
     val apiClient by lazy { CocApiClient { settingsRepository.apiKeyOnce() } }
 
-    val clanRepository by lazy {
-        ClanRepository(database.clanDao(), database.reminderDao(), apiClient)
+    val accountRepository by lazy {
+        AccountRepository(
+            database.accountDao(),
+            database.reminderDao(),
+            database.clanSightingDao(),
+            apiClient,
+        )
     }
 
     val notificationHelper by lazy { NotificationHelper(this) }
@@ -40,6 +46,7 @@ class ClashRemindersApp : Application(), Configuration.Provider {
         notificationHelper.createChannels()
         WorkManager.initialize(this, workManagerConfiguration)
         RefreshWorker.schedulePeriodic(this)
+        PresenceWorker.schedulePeriodic(this)
         RefreshWorker.enqueueNow(this)
     }
 }

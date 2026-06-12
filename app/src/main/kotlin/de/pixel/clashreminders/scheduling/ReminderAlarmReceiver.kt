@@ -16,9 +16,10 @@ class ReminderAlarmReceiver : BroadcastReceiver() {
             AlarmScheduler.ACTION_FIRE -> {
                 val reminderId = intent.getLongExtra(AlarmScheduler.EXTRA_REMINDER_ID, -1)
                 val eventKey = intent.getStringExtra(AlarmScheduler.EXTRA_EVENT_KEY)
+                val clanTag = intent.getStringExtra(AlarmScheduler.EXTRA_CLAN_TAG)
                 if (reminderId == -1L || eventKey == null) return
                 Log.d(AlarmScheduler.TAG, "Alarm fired for reminder=$reminderId key=$eventKey")
-                FireReminderWorker.enqueue(context, reminderId, eventKey)
+                FireReminderWorker.enqueue(context, reminderId, eventKey, clanTag)
             }
             AlarmScheduler.ACTION_CG_SNAPSHOT -> {
                 Log.d(AlarmScheduler.TAG, "Clan games snapshot alarm fired")

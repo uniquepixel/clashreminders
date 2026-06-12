@@ -5,110 +5,110 @@ import de.pixel.clashreminders.R
 import de.pixel.clashreminders.api.dto.CurrentWarDto
 
 /**
- * Turns analysis results into localized notification title + body,
- * the app-side equivalent of the Discord message builders in
- * ListeningEvent.java.
+ * Turns analysis results into localized notification title + body. All
+ * builders are account-based: they list the user's own accounts with open
+ * tasks and return null when everything is done — done means silence.
  */
 class ReminderContentBuilder(private val context: Context) {
 
     data class Content(val title: String, val text: String)
 
-    fun warEnd(clanName: String, remainingMillis: Long, open: List<OpenWarAttacker>): Content {
-        val title = context.getString(
-            R.string.notif_war_end_title, clanName, formatRemaining(remainingMillis)
-        )
-        val text =
-            if (open.isEmpty()) {
-                context.getString(R.string.notif_war_end_all_done)
-            } else {
-                open.joinToString("\n") {
-                    context.getString(R.string.notif_war_member_line, it.name, it.attacks, it.required)
-                }
-            }
-        return Content(title, text)
-    }
+    /** Open raid attacks of the user's accounts in one clan. */
+    data class ClanRaidOpen(
+        val clanName: String,
+        val open: List<RaidAnalysis.AccountRaidStatus>,
+    )
 
-    fun warStart(clanName: String, warState: String?): Content {
+    fun warStart(clanName: String, warState: String?, accountNames: List<String>): Content {
         val title = context.getString(R.string.notif_war_start_title, clanName)
-        val text =
+        val phase =
             if (warState == CurrentWarDto.STATE_IN_WAR) {
                 context.getString(R.string.notif_war_start_battle)
             } else {
                 context.getString(R.string.notif_war_start_preparation)
             }
+        val text = if (accountNames.isEmpty()) {
+            phase
+        } else {
+            phase + "\n" + context.getString(
+                R.string.notif_war_start_accounts, accountNames.joinToString(", ")
+            )
+        }
         return Content(title, text)
     }
 
-    fun cwlDay(clanName: String, remainingMillis: Long, open: List<OpenWarAttacker>): Content {
+    /** Null when none of the accounts has attacks left — no notification. */
+    fun warEnd(clanName: String, remainingMillis: Long, open: List<OpenWarAttacker>): Content? {
+        if (open.isEmpty()) return null
+        val title = context.getString(
+            R.string.notif_war_end_title, clanName, formatRemaining(remainingMillis)
+        )
+        return Content(title, accountAttackLines(open))
+    }
+
+    /** Null when none of the accounts has its CWL hit left — no notification. */
+    fun cwlDay(clanName: String, remainingMillis: Long, open: List<OpenWarAttacker>): Content? {
+        if (open.isEmpty()) return null
         val title = context.getString(
             R.string.notif_cwl_title, clanName, formatRemaining(remainingMillis)
         )
-        val text =
-            if (open.isEmpty()) {
-                context.getString(R.string.notif_cwl_all_done)
-            } else {
-                open.joinToString("\n") {
-                    context.getString(R.string.notif_war_member_line, it.name, it.attacks, it.required)
-                }
+        return Content(title, accountAttackLines(open))
+    }
+
+    /**
+     * One notification covering all clans of the user's accounts.
+     * Null when every account has used all raid attacks — no notification.
+     */
+    fun raid(remainingMillis: Long, perClan: List<ClanRaidOpen>): Content? {
+        val withOpen = perClan.filter { it.open.isNotEmpty() }
+        if (withOpen.isEmpty()) return null
+        val title = context.getString(R.string.notif_raid_title, formatRemaining(remainingMillis))
+        val text = withOpen.joinToString("\n\n") { clan ->
+            val lines = clan.open.joinToString("\n") {
+                context.getString(R.string.notif_raid_member_line, it.name, it.attacks, it.limit)
             }
+            if (withOpen.size == 1 && perClan.size == 1) lines else clan.clanName + "\n" + lines
+        }
         return Content(title, text)
     }
 
-    fun raid(clanName: String, remainingMillis: Long, result: RaidAnalysis.Result): Content {
-        val title = context.getString(
-            R.string.notif_raid_title, clanName, formatRemaining(remainingMillis)
-        )
-        if (result.allDone) {
-            return Content(title, context.getString(R.string.notif_raid_all_done))
-        }
-        val sections = mutableListOf<String>()
-        if (result.notAttacked.isNotEmpty()) {
-            sections += context.getString(R.string.notif_raid_not_attacked) + "\n" +
-                result.notAttacked.joinToString("\n") { it.name }
-        }
-        if (result.openAttacks.isNotEmpty()) {
-            sections += context.getString(R.string.notif_raid_open_attacks) + "\n" +
-                result.openAttacks.joinToString("\n") {
-                    context.getString(
-                        R.string.notif_raid_member_line,
-                        it.name, it.attacks, it.attackLimit + it.bonusAttackLimit,
-                    )
-                }
-        }
-        return Content(title, sections.joinToString("\n\n"))
-    }
-
-    /** Returns null when everyone is done — no notification then. */
+    /** Null when every account reached the threshold — no notification. */
     fun clanGames(
-        clanName: String,
         remainingMillis: Long,
         below: List<ClanGamesAnalysis.MemberProgress>,
+        threshold: Int,
     ): Content? {
         if (below.isEmpty()) return null
-        val title = context.getString(
-            R.string.notif_cg_title, clanName, formatRemaining(remainingMillis)
-        )
+        val title = context.getString(R.string.notif_cg_title, formatRemaining(remainingMillis))
         val text = below.joinToString("\n") {
             if (it.points == null) {
                 context.getString(R.string.notif_cg_no_baseline, it.name)
             } else {
-                context.getString(R.string.notif_cg_member_line, it.name, it.points)
+                context.getString(R.string.notif_cg_member_line, it.name, it.points, threshold)
             }
         }
         return Content(title, text)
     }
 
-    /** Fallback when the API stayed unreachable: fire without the member list. */
-    fun degraded(type: ReminderType, clanName: String): Content {
+    /** Fallback when the API stayed unreachable: fire without the account list. */
+    fun degraded(type: ReminderType, clanName: String?): Content {
         val title = when (type) {
-            ReminderType.WAR_END -> context.getString(R.string.notif_war_end_title, clanName, "?")
-            ReminderType.CWL_DAY_END -> context.getString(R.string.notif_cwl_title, clanName, "?")
-            ReminderType.RAID -> context.getString(R.string.notif_raid_title, clanName, "?")
-            ReminderType.CLAN_GAMES_END -> context.getString(R.string.notif_cg_title, clanName, "?")
-            ReminderType.WAR_START -> context.getString(R.string.notif_war_start_title, clanName)
+            ReminderType.WAR_END ->
+                context.getString(R.string.notif_war_end_title, clanName.orEmpty(), "?")
+            ReminderType.CWL_DAY_END ->
+                context.getString(R.string.notif_cwl_title, clanName.orEmpty(), "?")
+            ReminderType.RAID -> context.getString(R.string.notif_raid_title, "?")
+            ReminderType.CLAN_GAMES_END -> context.getString(R.string.notif_cg_title, "?")
+            ReminderType.WAR_START ->
+                context.getString(R.string.notif_war_start_title, clanName.orEmpty())
         }
         return Content(title, context.getString(R.string.notif_degraded_text))
     }
+
+    private fun accountAttackLines(open: List<OpenWarAttacker>): String =
+        open.joinToString("\n") {
+            context.getString(R.string.notif_war_member_line, it.name, it.attacks, it.required)
+        }
 
     fun formatRemaining(millis: Long): String {
         val totalMinutes = millis.coerceAtLeast(0) / 60_000
