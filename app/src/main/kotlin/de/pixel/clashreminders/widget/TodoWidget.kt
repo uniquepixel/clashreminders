@@ -175,6 +175,11 @@ private fun EntryRow(context: Context, entry: TodoWidgetState.Entry) {
         }
     }
 
+    val hasOpenCwl = entry.cwlState == CurrentWarDto.STATE_IN_WAR && entry.cwlDone < entry.cwlRequired
+    if (entry.cwlState == CurrentWarDto.STATE_IN_WAR) {
+        statusParts += context.getString(R.string.home_chip_cwl, entry.cwlDone, entry.cwlRequired)
+    }
+
     if (entry.raidAttacks != null && entry.raidLimit != null && entry.raidAttacks < entry.raidLimit) {
         statusParts += context.getString(R.string.home_chip_raid, entry.raidAttacks, entry.raidLimit)
     }
@@ -190,7 +195,7 @@ private fun EntryRow(context: Context, entry: TodoWidgetState.Entry) {
 
     val hasOpenRaid = entry.raidAttacks != null && entry.raidLimit != null &&
         entry.raidAttacks < entry.raidLimit
-    val isUrgent = hasOpenAttacks || hasOpenRaid
+    val isUrgent = hasOpenAttacks || hasOpenCwl || hasOpenRaid
 
     Row(
         modifier = GlanceModifier.fillMaxWidth().padding(vertical = 3.dp),

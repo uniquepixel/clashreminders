@@ -10,6 +10,7 @@ import de.pixel.clashreminders.data.db.entity.ClanSightingEntity
 import de.pixel.clashreminders.domain.AccountRef
 import de.pixel.clashreminders.domain.ClanGamesAnalysis
 import de.pixel.clashreminders.domain.ClanGamesCalendar
+import de.pixel.clashreminders.domain.CwlAnalysis
 import de.pixel.clashreminders.domain.RaidAnalysis
 import de.pixel.clashreminders.domain.RaidWeekend
 import de.pixel.clashreminders.domain.WarAnalysis
@@ -20,6 +21,13 @@ data class AccountStatus(
     val warState: String? = null,
     val warAttacksDone: Int = 0,
     val warAttacksRequired: Int = 0,
+    /**
+     * State of the account's current CWL day war (inWar), only set while the
+     * clan's league group is active and the account is in today's lineup.
+     */
+    val cwlState: String? = null,
+    val cwlAttacksDone: Int = 0,
+    val cwlAttacksRequired: Int = 0,
     /** Raid attacks used/limit, only set during the raid weekend. */
     val raidAttacks: Int? = null,
     val raidLimit: Int? = null,
@@ -29,6 +37,7 @@ data class AccountStatus(
 ) {
     val anythingOpen: Boolean get() =
         (warState == CurrentWarDto.STATE_IN_WAR && warAttacksDone < warAttacksRequired) ||
+        (cwlState == CurrentWarDto.STATE_IN_WAR && cwlAttacksDone < cwlAttacksRequired) ||
         (raidAttacks != null && raidLimit != null && raidAttacks < raidLimit) ||
         (cgActive && (cgPoints == null || cgPoints < ClanGamesAnalysis.DEFAULT_THRESHOLD))
 }
@@ -54,6 +63,7 @@ class AccountStatusLoader(
         onEach: suspend (LoadedStatus) -> Unit = {},
     ): List<LoadedStatus> {
         val warCache = mutableMapOf<String, CurrentWarDto?>()
+        val cwlCache = mutableMapOf<String, CurrentWarDto?>()
         val raidCache = mutableMapOf<String, RaidSeasonDto?>()
         val cgWindow = ClanGamesCalendar.currentWindow(now)
         val raidActive = RaidWeekend.isInWindow(now)
@@ -88,6 +98,23 @@ class AccountStatusLoader(
                     warState = war.state,
                     warAttacksDone = member.attacks.size,
                     warAttacksRequired = WarAnalysis.requiredAttacks(war),
+                )
+                break
+            }
+
+            // CWL lives on a separate endpoint than regular wars: during CWL the
+            // /currentwar endpoint reports notInWar, so the loop above finds
+            // nothing. Shown independently of whether the daily hit is done.
+            for (clanTag in candidateClans) {
+                val cwlWar = cwlCache.getOrPut(clanTag) {
+                    resolveCwlDayWar(clanTag)
+                } ?: continue
+                val side = WarAnalysis.ourSide(cwlWar, clanTag) ?: continue
+                val member = side.members.firstOrNull { it.tag == fresh.tag } ?: continue
+                status = status.copy(
+                    cwlState = cwlWar.state,
+                    cwlAttacksDone = member.attacks.size,
+                    cwlAttacksRequired = WarAnalysis.CWL_ATTACKS_PER_DAY,
                 )
                 break
             }
@@ -128,5 +155,24 @@ class AccountStatusLoader(
             onEach(loaded)
         }
         return results
+    }
+
+    /**
+     * The clan's currently running CWL day war (inWar), or null when the league
+     * group is inactive or no round is live. Preparation/ended rounds are
+     * ignored — only the round the user can act on today is reported.
+     */
+    private suspend fun resolveCwlDayWar(clanTag: String): CurrentWarDto? {
+        val group = api.getLeagueGroup(clanTag).valueOrNull() ?: return null
+        if (!CwlAnalysis.isGroupActive(group)) return null
+        for (round in group.rounds) {
+            for (warTag in round.warTags) {
+                if (!CwlAnalysis.isRealWarTag(warTag)) continue
+                val war = api.getCwlWar(warTag).valueOrNull() ?: continue
+                if (!WarAnalysis.isOurWar(war, clanTag)) continue
+                if (war.state == CurrentWarDto.STATE_IN_WAR) return war
+            }
+        }
+        return null
     }
 }

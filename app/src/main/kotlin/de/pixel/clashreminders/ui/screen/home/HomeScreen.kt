@@ -218,6 +218,17 @@ private fun StatusChips(status: AccountStatus?) {
             )
         }
     }
+    if (status.cwlState != null) {
+        val done = status.cwlAttacksDone >= status.cwlAttacksRequired
+        chips += {
+            StatusChip(
+                text = stringResource(
+                    R.string.home_chip_cwl, status.cwlAttacksDone, status.cwlAttacksRequired
+                ),
+                done = done,
+            )
+        }
+    }
     if (status.raidAttacks != null && status.raidLimit != null) {
         chips += {
             StatusChip(
