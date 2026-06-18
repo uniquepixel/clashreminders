@@ -176,7 +176,7 @@ private fun EntryRow(context: Context, entry: TodoWidgetState.Entry) {
     }
 
     val hasOpenCwl = entry.cwlState == CurrentWarDto.STATE_IN_WAR && entry.cwlDone < entry.cwlRequired
-    if (entry.cwlState == CurrentWarDto.STATE_IN_WAR) {
+    if (hasOpenCwl) {
         statusParts += context.getString(R.string.home_chip_cwl, entry.cwlDone, entry.cwlRequired)
     }
 
