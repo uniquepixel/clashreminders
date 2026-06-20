@@ -38,6 +38,7 @@ import androidx.glance.text.TextStyle
 import de.pixel.clashreminders.MainActivity
 import de.pixel.clashreminders.R
 import de.pixel.clashreminders.api.dto.CurrentWarDto
+import de.pixel.clashreminders.domain.ClanGamesAnalysis
 import java.text.DateFormat
 import java.util.Date
 
@@ -159,20 +160,12 @@ private fun BodyContent(context: Context, state: TodoWidgetState) {
 @Composable
 private fun EntryRow(context: Context, entry: TodoWidgetState.Entry) {
     val statusParts = mutableListOf<String>()
-    val hasOpenAttacks: Boolean
 
-    when {
-        entry.warState == CurrentWarDto.STATE_IN_WAR -> {
-            statusParts += context.getString(R.string.home_chip_war, entry.warDone, entry.warRequired)
-            hasOpenAttacks = entry.warDone < entry.warRequired
-        }
-        entry.warState == CurrentWarDto.STATE_PREPARATION -> {
-            statusParts += context.getString(R.string.home_chip_war_preparation)
-            hasOpenAttacks = false
-        }
-        else -> {
-            hasOpenAttacks = false
-        }
+    // Only show chips for things that still need doing — the widget is a to-do list.
+    val hasOpenAttacks = entry.warState == CurrentWarDto.STATE_IN_WAR &&
+        entry.warDone < entry.warRequired
+    if (hasOpenAttacks) {
+        statusParts += context.getString(R.string.home_chip_war, entry.warDone, entry.warRequired)
     }
 
     val hasOpenCwl = entry.cwlState == CurrentWarDto.STATE_IN_WAR && entry.cwlDone < entry.cwlRequired
@@ -180,11 +173,15 @@ private fun EntryRow(context: Context, entry: TodoWidgetState.Entry) {
         statusParts += context.getString(R.string.home_chip_cwl, entry.cwlDone, entry.cwlRequired)
     }
 
-    if (entry.raidAttacks != null && entry.raidLimit != null && entry.raidAttacks < entry.raidLimit) {
-        statusParts += context.getString(R.string.home_chip_raid, entry.raidAttacks, entry.raidLimit)
+    val hasOpenRaid = entry.raidAttacks != null && entry.raidLimit != null &&
+        entry.raidAttacks < entry.raidLimit
+    if (hasOpenRaid) {
+        statusParts += context.getString(R.string.home_chip_raid, entry.raidAttacks!!, entry.raidLimit!!)
     }
 
-    if (entry.cgActive) {
+    val hasOpenCg = entry.cgActive &&
+        (entry.cgPoints == null || entry.cgPoints < ClanGamesAnalysis.DEFAULT_THRESHOLD)
+    if (hasOpenCg) {
         val pts = entry.cgPoints
         if (pts != null) {
             statusParts += context.getString(R.string.home_chip_cg, pts)
@@ -193,9 +190,7 @@ private fun EntryRow(context: Context, entry: TodoWidgetState.Entry) {
         }
     }
 
-    val hasOpenRaid = entry.raidAttacks != null && entry.raidLimit != null &&
-        entry.raidAttacks < entry.raidLimit
-    val isUrgent = hasOpenAttacks || hasOpenCwl || hasOpenRaid
+    val isUrgent = hasOpenAttacks || hasOpenCwl || hasOpenRaid || hasOpenCg
 
     Row(
         modifier = GlanceModifier.fillMaxWidth().padding(vertical = 3.dp),
