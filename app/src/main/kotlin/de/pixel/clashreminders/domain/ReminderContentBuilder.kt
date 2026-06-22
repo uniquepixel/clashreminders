@@ -111,7 +111,10 @@ class ReminderContentBuilder(private val context: Context) {
         }
 
     fun formatRemaining(millis: Long): String {
-        val totalMinutes = millis.coerceAtLeast(0) / 60_000
+        // Round minutes up: a reminder fired 8m30s out should read "9m", not "8m".
+        // Truncating would understate the time left (the seconds spent fetching/
+        // verifying make the displayed value lag a minute behind reality).
+        val totalMinutes = (millis.coerceAtLeast(0) + 59_999) / 60_000
         val hours = totalMinutes / 60
         val minutes = totalMinutes % 60
         return if (hours > 0) {
